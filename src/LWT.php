@@ -217,7 +217,7 @@ final class LWT
             $initializationVector = openssl_random_pseudo_bytes($initializationVectorLength);
 
             // Шифруем данные с помощью алгоритма AES
-            $encryptedPayloadData = openssl_encrypt($payloadData, self::DATA_SYMMETRIC_ENCRYPTION, $encryptedAesKey, 0, $initializationVector);
+            $encryptedPayloadData = openssl_encrypt($payloadData, self::DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
 
             // Формируем полезную нагрузку токена
             $payloadData = pack('N', 4 + strlen($encryptedAesKey)) . $encryptedAesKey . $initializationVector . $encryptedPayloadData;
@@ -258,20 +258,21 @@ final class LWT
         if ($dataPrivateKey || self::$DATA_PRIVATE_KEY) {
 
             // Извлекаем длину зашифрованного ключа AES из данных
-            $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'];
+            $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'] - 4;
 
             // Извлекаем зашифрованный ключ AES из данных
             $encryptedAesKey = substr($payloadData, 4, $encryptedAesKeyLength);
 
             // Удаляем информацию о длине ключа и сам ключ из данных
-            $encryptedPayloadData = substr($payloadData, 4 + $encryptedAesKeyLength);
+            $encryptedPayload = substr($payloadData, 4 + $encryptedAesKeyLength);
 
             // Расшифровываем ключ AES с помощью шифрования RSA
             openssl_private_decrypt($encryptedAesKey, $aesKey, ($dataPrivateKey ?? self::$DATA_PRIVATE_KEY));
 
             // Извлекаем вектор инициализации из зашифрованных данных
             $initializationVectorLength = openssl_cipher_iv_length(self::DATA_SYMMETRIC_ENCRYPTION);
-            $initializationVector = substr($payloadData, 0, $initializationVectorLength);
+            $initializationVector = substr($encryptedPayload, 0, $initializationVectorLength);
+            $encryptedPayloadData = substr($encryptedPayload, $initializationVectorLength);
 
             // Расшифровываем данные с помощью алгоритма AES
             $payloadData = openssl_decrypt($encryptedPayloadData, self::DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
