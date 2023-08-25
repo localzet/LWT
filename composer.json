@@ -1,0 +1,30 @@
+{
+  "name": "localzet/lwt",
+  "description": "Localzet Web Tokens (JWT-based)",
+  "type": "library",
+  "keywords": [
+    "localzet", "lwt"
+  ],
+  "license": "AGPL-3.0-or-later",
+  "authors": [
+    {
+      "role": "Developer",
+      "name": "Ivan Zorin",
+      "email": "creator@localzet.com",
+      "homepage": "https://github.com/localzet"
+    }
+  ],
+  "support": {
+    "email": "support@localzet.com"
+  },
+  "require": {
+    "php": "^8.2",
+    "ext-openssl": "*",
+    "ext-mbstring": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "localzet\\": "src"
+    }
+  }
+}
