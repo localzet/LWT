@@ -27,6 +27,9 @@ final class LWT
     static ?string $DATA_PRIVATE_KEY = null; // Закрытый ключ в формате PEM (RSA)
     static ?string $DATA_PUBLIC_KEY = null; // Публичный ключ в формате PEM (RSA)
 
+    private const AES_KEY_LENGTH_OFFSET = 4;
+    private const AES_KEY_LENGTH = 32;
+
     /**
      * @return string
      */
@@ -184,62 +187,67 @@ final class LWT
      * Генерирует сегмент полезной нагрузки LWT-токена.
      *
      * Эта функция генерирует сегмент полезной нагрузки LWT-токена, используя данные и публичный ключ.
-     * Она кодирует данные в формате JSON, шифрует их с помощью алгоритма AES и RSA, и возвращает
+     * Она кодирует данные в формате JSON, шифрует их с помощью алгоритмов AES и RSA, и возвращает
      * полученную строку в формате base64url.
      *
-     * @param mixed $data Данные для кодирования в LWT-токен.
-     * @param string|null $dataPublicKey Публичный ключ в формате PEM (RSA).
+     * @param mixed $lwtTokenData Данные для кодирования в LWT-токен.
+     * @param string|null $rsaPublicKey Публичный ключ в формате PEM (RSA).
      *
      * @return string Возвращает сегмент полезной нагрузки токена в формате base64url.
      *
+     * @see https://tools.ietf.org/html/rfc7519
      * @see https://www.php.net/manual/en/function.openssl-random-pseudo-bytes.php
      * @see https://www.php.net/manual/en/function.openssl-public-encrypt.php
      * @see https://www.php.net/manual/en/function.openssl-cipher-iv-length.php
      * @see https://www.php.net/manual/en/function.openssl-encrypt.php
      */
     private static function generatePayloadSegment(
-        mixed  $data,
-        string $dataPublicKey = null,
+        mixed  $lwtTokenData,
+        string $rsaPublicKey = null,
     ): string
     {
         // Кодируем данные в формате JSON
-        $payloadData = self::jsonEncode($data);
+        $payloadData = self::jsonEncode($lwtTokenData);
 
-        if ($dataPublicKey || self::$DATA_PUBLIC_KEY) {
+        // Проверяем, указан ли публичный ключ или установлен ли он по умолчанию
+        if ($rsaPublicKey || self::$DATA_PUBLIC_KEY) {
             // Генерируем временный ключ AES
-            $aesKey = openssl_random_pseudo_bytes(32);
+            $aesKey = openssl_random_pseudo_bytes(self::AES_KEY_LENGTH);
 
             // Зашифровываем ключ AES с помощью шифрования RSA
-            openssl_public_encrypt($aesKey, $encryptedAesKey, ($dataPublicKey ?? self::$DATA_PUBLIC_KEY));
+            openssl_public_encrypt($aesKey, $encryptedAesKey, ($rsaPublicKey ?? self::$DATA_PUBLIC_KEY));
 
-            // Генерируем вектор инициализации
+            // Генерируем вектор инициализации для алгоритма AES
             $initializationVectorLength = openssl_cipher_iv_length(self::DATA_SYMMETRIC_ENCRYPTION);
             $initializationVector = openssl_random_pseudo_bytes($initializationVectorLength);
 
             // Шифруем данные с помощью алгоритма AES
             $encryptedPayloadData = openssl_encrypt($payloadData, self::DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
 
-            // Формируем полезную нагрузку токена
-            $payloadData = pack('N', 4 + strlen($encryptedAesKey)) . $encryptedAesKey . $initializationVector . $encryptedPayloadData;
+            // Формируем полезную нагрузку токена, добавляя информацию о длине ключа и сам ключ AES,
+            // а также вектор инициализации и зашифрованные данные
+            $payloadData = pack('N', self::AES_KEY_LENGTH_OFFSET + strlen($encryptedAesKey)) . $encryptedAesKey . $initializationVector . $encryptedPayloadData;
         }
 
         // Кодируем полезную нагрузку токена в формате base64url и возвращаем сгенерированный сегмент токена
         return self::base64UrlEncode($payloadData);
     }
 
+
+
     /**
      * Проверяет сегмент полезной нагрузки LWT-токена.
      *
      * Эта функция проверяет сегмент полезной нагрузки LWT-токена. Она расшифровывает данные,
      * используя закрытый ключ и алгоритмы AES и RSA, и возвращает расшифрованные данные. Если при
-     * расшифровке произошла ошибка, функция выбрасывает исключение UnexpectedValueException.
+     * расшифровке произошла ошибка, функция выбрасывает исключение DecryptionException.
      *
-     * @param string $payloadSegment Сегмент полезной нагрузки LWT-токена.
-     * @param string|null $dataPrivateKey Закрытый ключ в формате PEM (RSA).
+     * @param string $lwtTokenPayloadSegment Сегмент полезной нагрузки LWT-токена.
+     * @param string|null $rsaPrivateKey Закрытый ключ в формате PEM (RSA).
      *
      * @return mixed Возвращает расшифрованные данные из токена.
      *
-     * @throws UnexpectedValueException Если при расшифровке произошла ошибка.
+     * @throws DecryptionException Если при расшифровке произошла ошибка.
      *
      * @see https://www.php.net/manual/en/function.unpack.php
      * @see https://www.php.net/manual/en/function.substr.php
@@ -248,26 +256,26 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-decrypt.php
      */
     private static function verifyPayloadSegment(
-        string  $payloadSegment,
-        ?string $dataPrivateKey
+        string  $lwtTokenPayloadSegment,
+        ?string $rsaPrivateKey
     ): mixed
     {
         // Декодируем тело из base64url
-        $payloadData = self::base64UrlDecode($payloadSegment);
+        $payloadData = self::base64UrlDecode($lwtTokenPayloadSegment);
 
-        if ($dataPrivateKey || self::$DATA_PRIVATE_KEY) {
+        if ($rsaPrivateKey || self::$DATA_PRIVATE_KEY) {
 
             // Извлекаем длину зашифрованного ключа AES из данных
-            $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'] - 4;
+            $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'] - self::AES_KEY_LENGTH_OFFSET;
 
             // Извлекаем зашифрованный ключ AES из данных
-            $encryptedAesKey = substr($payloadData, 4, $encryptedAesKeyLength);
+            $encryptedAesKey = substr($payloadData, self::AES_KEY_LENGTH_OFFSET, $encryptedAesKeyLength);
 
             // Удаляем информацию о длине ключа и сам ключ из данных
-            $encryptedPayload = substr($payloadData, 4 + $encryptedAesKeyLength);
+            $encryptedPayload = substr($payloadData, self::AES_KEY_LENGTH_OFFSET + $encryptedAesKeyLength);
 
             // Расшифровываем ключ AES с помощью шифрования RSA
-            openssl_private_decrypt($encryptedAesKey, $aesKey, ($dataPrivateKey ?? self::$DATA_PRIVATE_KEY));
+            openssl_private_decrypt($encryptedAesKey, $aesKey, ($rsaPrivateKey ?? self::$DATA_PRIVATE_KEY));
 
             // Извлекаем вектор инициализации из зашифрованных данных
             $initializationVectorLength = openssl_cipher_iv_length(self::DATA_SYMMETRIC_ENCRYPTION);
@@ -282,12 +290,13 @@ final class LWT
         $payload = self::jsonDecode($payloadData);
         if (!$payload) {
             // Если при расшифровке произошла ошибка, выбрасываем исключение
-            throw new UnexpectedValueException('Ошибка шифрования параметров');
+            throw new DecryptionException('Ошибка шифрования параметров');
         }
 
         // Возвращаем расшифрованные данные
         return $payload;
     }
+
 
 
     /**
