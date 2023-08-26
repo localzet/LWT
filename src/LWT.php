@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace localzet;
 
 use DomainException;
+use RuntimeException;
 use UnexpectedValueException;
 use function strlen;
 
@@ -27,8 +28,15 @@ final class LWT
     static ?string $DATA_PRIVATE_KEY = null; // Закрытый ключ в формате PEM (RSA)
     static ?string $DATA_PUBLIC_KEY = null; // Публичный ключ в формате PEM (RSA)
 
+    private const LWT_TOKEN_SEGMENTS_COUNT = 3;
     private const AES_KEY_LENGTH_OFFSET = 4;
     private const AES_KEY_LENGTH = 32;
+    private const HASH_RAW_OUTPUT = true;
+    private const OPENSSL_VERIFY_SUCCESS = 1;
+    private const BASE64_GROUP_SIZE = 4;
+    private const JSON_MAX_DEPTH = 512;
+    private const STRINGS_MATCH = 0;
+    private const MBSTRING_ENCODING = '8bit';
 
     /**
      * @return string
@@ -54,6 +62,7 @@ final class LWT
         );
     }
 
+
     /**
      * Кодирует данные в LWT-токен.
      *
@@ -61,26 +70,26 @@ final class LWT
      * данные, закрытый ключ, публичный ключ и алгоритм шифрования в качестве аргументов.
      * Если эти аргументы не указаны, используются значения по умолчанию, определенные в классе.
      *
-     * @param mixed $data Данные для кодирования в LWT-токен.
-     * @param string|null $tokenPrivateKey Закрытый ключ в формате PEM (ECDSA).
+     * @param mixed $lwtTokenData Данные для кодирования в LWT-токен.
+     * @param string|null $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
      * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
-     * @param string|null $dataPublicKey Публичный ключ в формате PEM (RSA).
+     * @param string|null $rsaPublicKey Публичный ключ в формате PEM (RSA).
      *
      * @return string Возвращает строку, представляющую закодированный LWT-токен.
      */
     public static function encode(
-        mixed  $data,
-        string $tokenPrivateKey = null,
+        mixed  $lwtTokenData,
+        string $ecdsaPrivateKey = null,
         string $tokenEncryption = null,
-        string $dataPublicKey = null,
+        string $rsaPublicKey = null,
     ): string
     {
         // Генерируем сегмент заголовка токена
         $headerSegment = self::generateHeaderSegment();
         // Генерируем сегмент полезной нагрузки токена
-        $payloadSegment = self::generatePayloadSegment($data, $dataPublicKey);
+        $payloadSegment = self::generatePayloadSegment($lwtTokenData, $rsaPublicKey);
         // Генерируем сигнатуру токена
-        $signatureSegment = self::generateSignature($headerSegment, $payloadSegment, $tokenPrivateKey, $tokenEncryption);
+        $signatureSegment = self::generateSignature($headerSegment, $payloadSegment, $ecdsaPrivateKey, $tokenEncryption);
 
         // Возвращаем закодированный токен
         return "$headerSegment.$payloadSegment.$signatureSegment";
@@ -95,24 +104,24 @@ final class LWT
      * Если эти аргументы не указаны, используются значения по умолчанию, определенные в классе.
      *
      * @param string $encodedToken Закодированный LWT-токен.
-     * @param string|null $tokenPublicKey Публичный ключ в формате PEM (ECDSA).
+     * @param string|null $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
      * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
-     * @param string|null $dataPrivateKey Закрытый ключ в формате PEM (RSA).
+     * @param string|null $rsaPrivateKey Закрытый ключ в формате PEM (RSA).
      *
      * @return mixed Возвращает расшифрованные данные из токена.
      *
-     * @throws UnexpectedValueException Если токен имеет неверное количество сегментов.
+     * @throws UnexpectedValueException|RuntimeException Если токен имеет неверное количество сегментов.
      */
     public static function decode(
         string $encodedToken,
-        string $tokenPublicKey = null,
+        string $ecdsaPublicKey = null,
         string $tokenEncryption = null,
-        string $dataPrivateKey = null,
+        string $rsaPrivateKey = null,
     ): mixed
     {
         // Разбиваем токен на сегменты
         $segments = explode('.', $encodedToken);
-        if (count($segments) !== 3) {
+        if (count($segments) !== self::LWT_TOKEN_SEGMENTS_COUNT) {
             // Если токен имеет неверное количество сегментов, выбрасываем исключение
             throw new UnexpectedValueException('Неверное кол-во сегментов');
         }
@@ -123,13 +132,14 @@ final class LWT
         // Проверяем сегмент заголовка
         self::verifyHeaderSegment($headerSegment);
         // Проверяем сегмент полезной нагрузки и извлекаем расшифрованные данные
-        $payload = self::verifyPayloadSegment($payloadSegment, $dataPrivateKey);
+        $payload = self::verifyPayloadSegment($payloadSegment, $rsaPrivateKey);
         // Проверяем сигнатуру токена
-        self::verifySignature($headerSegment, $payloadSegment, $signatureSegment, $tokenPublicKey, $tokenEncryption);
+        self::verifySignature($headerSegment, $payloadSegment, $signatureSegment, $ecdsaPublicKey, $tokenEncryption);
 
         // Возвращаем расшифрованные данные
         return $payload;
     }
+
 
     /**
      * Генерирует сегмент заголовка LWT-токена.
@@ -161,14 +171,14 @@ final class LWT
      * шифрования соответствуют значениям по умолчанию, определенным в классе. Если проверка не пройдена,
      * функция выбрасывает исключение UnexpectedValueException.
      *
-     * @param string $headerSegment Сегмент заголовка LWT-токена.
+     * @param string $lwtTokenHeaderSegment Сегмент заголовка LWT-токена.
      *
      * @throws UnexpectedValueException Если тип токена или алгоритм шифрования не соответствуют значениям по умолчанию.
      */
-    private static function verifyHeaderSegment(string $headerSegment): void
+    private static function verifyHeaderSegment(string $lwtTokenHeaderSegment): void
     {
         // Декодируем сегмент заголовка из формата base64url
-        $headerJson = self::base64UrlDecode($headerSegment);
+        $headerJson = self::base64UrlDecode($lwtTokenHeaderSegment);
         // Декодируем заголовок из формата JSON
         $header = self::jsonDecode($headerJson);
 
@@ -182,6 +192,7 @@ final class LWT
             throw new UnexpectedValueException('Ошибка шифрования заголовка');
         }
     }
+
 
     /**
      * Генерирует сегмент полезной нагрузки LWT-токена.
@@ -233,21 +244,19 @@ final class LWT
         return self::base64UrlEncode($payloadData);
     }
 
-
-
     /**
      * Проверяет сегмент полезной нагрузки LWT-токена.
      *
      * Эта функция проверяет сегмент полезной нагрузки LWT-токена. Она расшифровывает данные,
      * используя закрытый ключ и алгоритмы AES и RSA, и возвращает расшифрованные данные. Если при
-     * расшифровке произошла ошибка, функция выбрасывает исключение DecryptionException.
+     * расшифровке произошла ошибка, функция выбрасывает исключение RuntimeException.
      *
      * @param string $lwtTokenPayloadSegment Сегмент полезной нагрузки LWT-токена.
      * @param string|null $rsaPrivateKey Закрытый ключ в формате PEM (RSA).
      *
      * @return mixed Возвращает расшифрованные данные из токена.
      *
-     * @throws DecryptionException Если при расшифровке произошла ошибка.
+     * @throws RuntimeException Если при расшифровке произошла ошибка.
      *
      * @see https://www.php.net/manual/en/function.unpack.php
      * @see https://www.php.net/manual/en/function.substr.php
@@ -290,50 +299,48 @@ final class LWT
         $payload = self::jsonDecode($payloadData);
         if (!$payload) {
             // Если при расшифровке произошла ошибка, выбрасываем исключение
-            throw new DecryptionException('Ошибка шифрования параметров');
+            throw new RuntimeException('Ошибка шифрования параметров');
         }
 
         // Возвращаем расшифрованные данные
         return $payload;
     }
 
-
-
     /**
      * Генерирует сигнатуру для LWT-токена.
      *
      * Эта функция генерирует сигнатуру для LWT-токена, используя алгоритм шифрования,
-     * указанный в аргументе $tokenEncryption. Если этот аргумент не указан, используется
+     * указанный в аргументе $signatureAlgorithm. Если этот аргумент не указан, используется
      * значение по умолчанию, определенное в классе. Функция также принимает закрытый ключ
-     * в качестве аргумента $tokenPrivateKey. Если этот аргумент не указан, используется
+     * в качестве аргумента $ecdsaPrivateKey. Если этот аргумент не указан, используется
      * значение по умолчанию, определенное в классе.
      *
      * @param string $headerSegment Сегмент заголовка LWT-токена.
      * @param string $payloadSegment Сегмент полезной нагрузки LWT-токена.
-     * @param string|null $tokenPrivateKey Закрытый ключ в формате PEM (ECDSA).
-     * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
+     * @param string|null $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
+     * @param string|null $signatureAlgorithm Алгоритм шифрования (например, 'HS256', 'RS256').
      *
      * @return string Возвращает сигнатуру в формате base64url.
      *
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      * @see https://www.php.net/manual/en/function.hash-hmac.php
      */
-    private static function generateSignature(string $headerSegment, string $payloadSegment, ?string $tokenPrivateKey, ?string $tokenEncryption): string
+    private static function generateSignature(string $headerSegment, string $payloadSegment, ?string $ecdsaPrivateKey, ?string $signatureAlgorithm): string
     {
         // Генерируем LWT-совместимую сигнатуру
-        $algorithm = $tokenEncryption ?? self::LWT_ENCRYPTION;
+        $algorithm = $signatureAlgorithm ?? self::LWT_ENCRYPTION;
         $data = "$headerSegment.$payloadSegment";
-        $private_key = ($tokenPrivateKey ?? self::$LWT_PRIVATE_KEY);
+        $private_key = ($ecdsaPrivateKey ?? self::$LWT_PRIVATE_KEY);
 
         switch ($algorithm) {
             case 'HS256':   // HMAC-SHA256
-                $signature = hash_hmac('SHA256', $data, self::generateHmacKeyFromPrivateKey($private_key), true);
+                $signature = hash_hmac('SHA256', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
                 break;
             case 'HS384':   // HMAC-SHA384
-                $signature = hash_hmac('SHA384', $data, self::generateHmacKeyFromPrivateKey($private_key), true);
+                $signature = hash_hmac('SHA384', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
                 break;
             case 'HS512':   // HMAC-SHA512
-                $signature = hash_hmac('SHA512', $data, self::generateHmacKeyFromPrivateKey($private_key), true);
+                $signature = hash_hmac('SHA512', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
                 break;
 
             case 'RS256':   // RSA-SHA256
@@ -355,48 +362,49 @@ final class LWT
         return self::base64UrlEncode($signature);
     }
 
+
     /**
      * Проверяет сигнатуру LWT-токена.
      *
      * Эта функция проверяет сигнатуру LWT-токена, используя алгоритм шифрования,
-     * указанный в аргументе $tokenEncryption. Если этот аргумент не указан, используется
+     * указанный в аргументе $signatureAlgorithm. Если этот аргумент не указан, используется
      * значение по умолчанию, определенное в классе. Функция также принимает публичный ключ
-     * в качестве аргумента $tokenPublicKey. Если этот аргумент не указан, используется
+     * в качестве аргумента $ecdsaPublicKey. Если этот аргумент не указан, используется
      * значение по умолчанию, определенное в классе.
      *
      * @param string $headerSegment Сегмент заголовка LWT-токена.
      * @param string $payloadSegment Сегмент полезной нагрузки LWT-токена.
      * @param string $signatureSegment Сегмент сигнатуры LWT-токена.
-     * @param string|null $tokenPublicKey Публичный ключ в формате PEM (ECDSA).
-     * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
+     * @param string|null $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
+     * @param string|null $signatureAlgorithm Алгоритм шифрования (например, 'HS256', 'RS256').
      *
      * @see https://www.php.net/manual/en/function.openssl-verify.php
      * @see https://www.php.net/manual/en/function.hash-hmac.php
      */
-    private static function verifySignature(string $headerSegment, string $payloadSegment, string $signatureSegment, ?string $tokenPublicKey, ?string $tokenEncryption): void
+    private static function verifySignature(string $headerSegment, string $payloadSegment, string $signatureSegment, ?string $ecdsaPublicKey, ?string $signatureAlgorithm): void
     {
         // Проверяем сигнатуру
         $signature = self::base64UrlDecode($signatureSegment);
 
-        $algorithm = $tokenEncryption ?? self::LWT_ENCRYPTION;
+        $algorithm = $signatureAlgorithm ?? self::LWT_ENCRYPTION;
         $data = "$headerSegment.$payloadSegment";
-        $public_key = ($tokenPublicKey ?? self::$LWT_PUBLIC_KEY);
+        $public_key = ($ecdsaPublicKey ?? self::$LWT_PUBLIC_KEY);
 
         switch ($algorithm) {
             case 'HS256':   // HMAC-SHA256
-                $hash = hash_hmac('SHA256', $data, self::generateHmacKeyFromPublicKey($public_key), true);
+                $hash = hash_hmac('SHA256', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
                 if (!self::hashEquals($hash, $signature)) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
             case 'HS384':   // HMAC-SHA384
-                $hash = hash_hmac('SHA384', $data, self::generateHmacKeyFromPublicKey($public_key), true);
+                $hash = hash_hmac('SHA384', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
                 if (!self::hashEquals($hash, $signature)) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
             case 'HS512':   // HMAC-SHA512
-                $hash = hash_hmac('SHA512', $data, self::generateHmacKeyFromPublicKey($public_key), true);
+                $hash = hash_hmac('SHA512', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
                 if (!self::hashEquals($hash, $signature)) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
@@ -404,25 +412,26 @@ final class LWT
 
             case 'RS256':   // RSA-SHA256
             case 'ES256':   // ECDSA-SHA256
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA256) !== 1) {
+                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA256) !== self::OPENSSL_VERIFY_SUCCESS) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
             case 'RS384':   // RSA-SHA384
             case 'ES384':   // ECDSA-SHA384
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA384) !== 1) {
+                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA384) !== self::OPENSSL_VERIFY_SUCCESS) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
             case 'RS512':   // RSA-SHA512
             case 'ES512':   // ECDSA-SHA512
             default:
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA512) !== 1) {
+                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA512) !== self::OPENSSL_VERIFY_SUCCESS) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
         }
     }
+
 
     /**
      * Генерирует HMAC-ключ из закрытого ключа.
@@ -431,7 +440,7 @@ final class LWT
      * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
      * методов шифрования, которые определены в классе.
      *
-     * @param string $privateKey Закрытый ключ в формате PEM (ECDSA).
+     * @param string $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
      *
      * @return string Возвращает HMAC-ключ.
      *
@@ -439,7 +448,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-pkey-get-details.php
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      */
-    private static function generateHmacKeyFromPrivateKey(string $privateKey): string
+    private static function generateHmacKeyFromPrivateKey(string $ecdsaPrivateKey): string
     {
         // Генерируем предварительный ключ
         $data = self::LWT_TYPE .
@@ -449,12 +458,12 @@ final class LWT
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
         // Получаем информацию о закрытом ключе
-        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_private($privateKey));
+        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_private($ecdsaPrivateKey));
         // Извлекаем публичный ключ из информации о закрытом ключе
-        $publicKey = $keyDetails['key'];
+        $ecdsaPublicKey = $keyDetails['key'];
 
         // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-        openssl_sign($data, $signature, $publicKey, OPENSSL_ALGO_SHA512);
+        openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
 
         return $signature;
     }
@@ -466,13 +475,13 @@ final class LWT
      * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
      * методов шифрования, которые определены в классе.
      *
-     * @param string $publicKey Публичный ключ в формате PEM (ECDSA).
+     * @param string $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
      *
      * @return string Возвращает HMAC-ключ.
      *
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      */
-    private static function generateHmacKeyFromPublicKey(string $publicKey): string
+    private static function generateHmacKeyFromPublicKey(string $ecdsaPublicKey): string
     {
         // Генерируем предварительный ключ
         $data = self::LWT_TYPE .
@@ -482,10 +491,11 @@ final class LWT
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
         // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-        openssl_sign($data, $signature, $publicKey, OPENSSL_ALGO_SHA512);
+        openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
 
         return $signature;
     }
+
 
     /**
      * Кодирует данные в формате base64url.
@@ -493,18 +503,18 @@ final class LWT
      * Эта функция кодирует данные в формате base64url, который является URL-безопасной версией
      * кодировки base64. Она заменяет символы '+', '/' и '=' на '-', '_' и '' соответственно.
      *
-     * @param mixed $data Данные для кодирования в формате base64url.
+     * @param mixed $inputData Данные для кодирования в формате base64url.
      *
      * @return string Возвращает строку в формате base64url, представляющую закодированные данные.
      *
      * @see https://www.php.net/manual/en/function.base64-encode.php
      */
-    private static function base64UrlEncode(mixed $data): string
+    private static function base64UrlEncode(mixed $inputData): string
     {
         // Кодируем данные в формате base64
-        $base64 = base64_encode($data);
+        $base64EncodedData = base64_encode($inputData);
         // Заменяем символы '+', '/' и '=' на '-', '_' и '' соответственно
-        return str_replace(['+', '/', '='], ['-', '_', ''], $base64);
+        return str_replace(['+', '/', '='], ['-', '_', ''], $base64EncodedData);
     }
 
     /**
@@ -513,27 +523,26 @@ final class LWT
      * Эта функция декодирует данные из формата base64url, который является URL-безопасной версией
      * кодировки base64. Она заменяет символы '-', '_' и '' на '+', '/' и '=' соответственно.
      *
-     * @param string $data Строка в формате base64url для декодирования.
+     * @param string $inputData Строка в формате base64url для декодирования.
      *
      * @return false|string Возвращает декодированные данные или false, если произошла ошибка.
      *
      * @see https://www.php.net/manual/en/function.base64-decode.php
      */
-    private static function base64UrlDecode(string $data): false|string
+    private static function base64UrlDecode(string $inputData): false|string
     {
         // Вычисляем остаток от деления длины строки на 4
-        $remainder = strlen($data) % 4;
+        $remainder = strlen($inputData) % self::BASE64_GROUP_SIZE;
         if ($remainder) {
             // Если остаток не равен нулю, добавляем символы '=' в конец строки
-            $padlen = 4 - $remainder;
-            $data .= str_repeat('=', $padlen);
+            $padlen = self::BASE64_GROUP_SIZE - $remainder;
+            $inputData .= str_repeat('=', $padlen);
         }
         // Заменяем символы '-', '_' и '' на '+', '/' и '=' соответственно
-        $base64 = str_replace(['-', '_'], ['+', '/'], $data);
+        $base64EncodedData = str_replace(['-', '_'], ['+', '/'], $inputData);
         // Декодируем данные из формата base64
-        return base64_decode($base64);
+        return base64_decode($base64EncodedData);
     }
-
 
     /**
      * Декодирует JSON-строку.
@@ -542,7 +551,7 @@ final class LWT
      * дополнительные флаги для управления поведением декодирования. Если при декодировании
      * произошла ошибка, функция выбрасывает исключение DomainException с сообщением об ошибке.
      *
-     * @param string $value JSON-строка для декодирования.
+     * @param string $jsonString JSON-строка для декодирования.
      *
      * @return mixed Возвращает ассоциативный массив, представляющий декодированные данные.
      *
@@ -551,10 +560,10 @@ final class LWT
      * @see https://www.php.net/manual/en/function.json-decode.php
      * @see https://www.php.net/manual/en/function.json-last-error.php
      */
-    private static function jsonDecode(string $value): mixed
+    private static function jsonDecode(string $jsonString): mixed
     {
         // Декодируем JSON-строку с использованием указанных флагов
-        $data = json_decode($value, true, 512, JSON_BIGINT_AS_STRING);
+        $decodedData = json_decode($jsonString, true, self::JSON_MAX_DEPTH, JSON_BIGINT_AS_STRING);
 
         // Проверяем наличие ошибок при декодировании JSON
         if ($errno = json_last_error()) {
@@ -570,14 +579,15 @@ final class LWT
             throw new DomainException(
                 $messages[$errno] ?? 'Ошибка JSON: ' . $errno
             );
-        } elseif ($data === null && $value !== 'null') {
+        } elseif ($decodedData === null && $jsonString !== 'null') {
             // Если данные равны null, но строка не равна 'null', выбрасываем исключение
             throw new DomainException('Попытка интерпретировать не-JSON');
         }
 
         // Возвращаем декодированные данные
-        return $data;
+        return $decodedData;
     }
+
 
     /**
      * Кодирует данные в формате JSON.
@@ -586,7 +596,7 @@ final class LWT
      * дополнительные флаги для управления поведением кодирования. Если при кодировании произошла ошибка,
      * функция выбрасывает исключение DomainException с сообщением об ошибке.
      *
-     * @param mixed $value Данные для кодирования в формате JSON.
+     * @param mixed $inputData Данные для кодирования в формате JSON.
      *
      * @return string Возвращает строку в формате JSON, представляющую закодированные данные.
      *
@@ -595,10 +605,10 @@ final class LWT
      * @see https://www.php.net/manual/en/function.json-encode.php
      * @see https://www.php.net/manual/en/function.json-last-error.php
      */
-    private static function jsonEncode(mixed $value): string
+    private static function jsonEncode(mixed $inputData): string
     {
         // Кодируем данные в формате JSON с использованием указанных флагов
-        $json = json_encode($value, JSON_UNESCAPED_SLASHES);
+        $jsonEncodedData = json_encode($inputData, JSON_UNESCAPED_SLASHES);
 
         // Проверяем наличие ошибок при кодировании JSON
         if ($errno = json_last_error()) {
@@ -612,13 +622,13 @@ final class LWT
             ];
             // Выбрасываем исключение с соответствующим сообщением об ошибке
             throw new DomainException($messages[$errno] ?? 'Ошибка JSON: ' . $errno);
-        } elseif ($json === false) {
+        } elseif ($jsonEncodedData === false) {
             // Если результат кодирования равен false, выбрасываем исключение
             throw new DomainException('Попытка интерпретировать не-JSON');
         }
 
         // Возвращаем закодированную строку
-        return $json;
+        return $jsonEncodedData;
     }
 
 
@@ -629,14 +639,14 @@ final class LWT
      * атаки по времени. Она использует встроенную функцию hash_equals, если она доступна,
      * и реализует свой алгоритм сравнения в противном случае.
      *
-     * @param string $left Первая строка для сравнения.
-     * @param string $right Вторая строка для сравнения.
+     * @param string $firstString Первая строка для сравнения.
+     * @param string $secondString Вторая строка для сравнения.
      *
      * @return bool Возвращает true, если строки равны, и false в противном случае.
      *
      * @see https://www.php.net/manual/en/function.hash-equals.php
      */
-    private static function hashEquals(string $left, string $right): bool
+    private static function hashEquals(string $firstString, string $secondString): bool
     {
         static $native = null;
         if ($native === null) {
@@ -644,25 +654,24 @@ final class LWT
         }
         if ($native) {
             // Используем встроенную функцию hash_equals для сравнения строк
-            return hash_equals($left, $right);
+            return hash_equals($firstString, $secondString);
         }
 
         // Определяем минимальную длину строк
-        $len = min(self::safeStrlen($left), self::safeStrlen($right));
+        $len = min(self::safeStrlen($firstString), self::safeStrlen($secondString));
 
         // Сравниваем строки побайтово
         $status = 0;
         for ($i = 0; $i < $len; $i++) {
             // Используем побитовое XOR для сравнения байтов
-            $status |= (ord($left[$i]) ^ ord($right[$i]));
+            $status |= (ord($firstString[$i]) ^ ord($secondString[$i]));
         }
         // Сравниваем длины строк
-        $status |= (self::safeStrlen($left) ^ self::safeStrlen($right));
+        $status |= (self::safeStrlen($firstString) ^ self::safeStrlen($secondString));
 
         // Возвращаем результат сравнения
-        return ($status === 0);
+        return ($status === self::STRINGS_MATCH);
     }
-
 
     /**
      * Возвращает длину строки в безопасном режиме.
@@ -671,14 +680,14 @@ final class LWT
      * и функцию strlen в противном случае. Она предназначена для использования в ситуациях,
      * когда необходимо получить длину строки в байтах, а не в символах.
      *
-     * @param string $str Строка, длина которой нужно получить.
+     * @param string $inputString Строка, длина которой нужно получить.
      *
      * @return int Возвращает длину строки в байтах.
      *
      * @see https://www.php.net/manual/en/function.mb-strlen.php
      * @see https://www.php.net/manual/en/function.strlen.php
      */
-    private static function safeStrlen(string $str): int
+    private static function safeStrlen(string $inputString): int
     {
         static $exists = null;
         if ($exists === null) {
@@ -686,11 +695,12 @@ final class LWT
         }
         if ($exists) {
             // Используем функцию mb_strlen с кодировкой '8bit' для получения длины строки в байтах
-            return mb_strlen($str, '8bit');
+            return mb_strlen($inputString, self::MBSTRING_ENCODING);
         } else {
             // Используем функцию strlen для получения длины строки в байтах
-            return strlen($str);
+            return strlen($inputString);
         }
     }
+
 
 }
