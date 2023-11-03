@@ -5,28 +5,133 @@ declare(strict_types=1);
 namespace localzet;
 
 use DomainException;
+use Exception;
 use RuntimeException;
+use Throwable;
 use UnexpectedValueException;
 use function strlen;
 
+/**
+ * Класс LWT (Localzet Web Token)
+ *
+ * Этот класс предназначен для работы с LWT-токенами. LWT-токены - это специфический тип JWT-токенов, 
+ * используемых для аутентификации и передачи информации между двумя сторонами.
+ *
+ * @link https://tools.ietf.org/html/rfc7519 Официальная документация по JWT-токенам
+ */
 final class LWT
 {
-// Определение констант для типа, шифрования и алгоритма LWT-токена
-    private const LWT_TYPE = 'LWTv3'; // Тип LWT-токена
-    private const LWT_ALGORITHM = 'LZX:{D-SYM}+{D-ASYM}*(HMAC/RSA/ECDSA)-SHA(256/384/512)'; // Алгоритм шифрования для данных LWT-токена
-    const LWT_ENCRYPTION = 'ES512'; // Алгоритм шифрования для сигнатуры LWT-токена
+    /**
+     * Тип LWT-токена
+     *
+     * @var string LWT_TYPE
+     */
+    private const LWT_TYPE = 'LWTv3';
 
-// Определение статических свойств для закрытого и публичного ключей LWT-токена
-    static ?string $LWT_PRIVATE_KEY = null; // Закрытый ключ в формате PEM (ECDSA)
-    static ?string $LWT_PUBLIC_KEY = null; // Публичный ключ в формате PEM (ECDSA)
+    /**
+     * Алгоритм шифрования для данных LWT-токена
+     *
+     * @var string LWT_ALGORITHM
+     */
+    private const LWT_ALGORITHM = 'LZX:{D-SYM}+{D-ASYM}*{L-ENCRYPT}-{L-HASH}';
 
-// Определение констант для симметричного и асимметричного шифрования данных
-    private const DATA_SYMMETRIC_ENCRYPTION = 'AES-256-CBC'; // Алгоритм симметричного шифрования данных
-    private const DATA_ASYMMETRIC_ENCRYPTION = 'RSA'; // Алгоритм асимметричного шифрования данных
+    /**
+     * Допустимые алгоритмы шифрования для данных LWT-токена
+     *
+     * @var array LWT_ALLOWED_ENCRYPTIONS
+     */
+    private const LWT_ALLOWED_ENCRYPTIONS = [
+        'HS256', 'HS384', 'HS512',          // Симметричные алгоритмы
+        'RS256', 'RS384', 'RS512',          // Асимметричные алгоритмы (RSA-PKCS#1) 
+        'ES256', 'ES384', 'ES512',          // Асимметричные алгоритмы, основанные на эллиптической кривой
+        'EdDSA',                            // Асимметричный алгоритм, основанный на кривой Эдвардса (Ed25519 или Ed448)
+        'RS1', 'HS1', 'HS256/64', 'ES256K', // Экспериментальные алгоритмы
+        /*
+            RS1 и HS1 используют алгоритм хэширования SHA-1
+            HS256/64 после генерации сигнатуры оставляет только первые 8 символов
+            ES256K выделен для ECDSA на кривой secp256k1 
+        */
+    ];
 
-// Определение статических свойств для закрытого и публичного ключей данных
-    static ?string $DATA_PRIVATE_KEY = null; // Закрытый ключ в формате PEM (RSA)
-    static ?string $DATA_PUBLIC_KEY = null; // Публичный ключ в формате PEM (RSA)
+    /**
+     * Алгоритм шифрования для сигнатуры LWT-токена
+     *
+     * Определяет алгоритм шифрования, который будет использоваться для создания цифровой подписи токена.
+     *
+     * @var string $LWT_ENCRYPTION
+     */
+    static string $LWT_ENCRYPTION = 'ES512';
+
+    /**
+     * Закрытый ключ в формате PEM (ECDSA)
+     *
+     * Используется для создания цифровой подписи токена.
+     *
+     * @var string $LWT_PRIVATE_KEY
+     */
+    static ?string $LWT_PRIVATE_KEY = null;
+
+    /**
+     * Публичный ключ в формате PEM (ECDSA)
+     *
+     * Используется для проверки цифровой подписи токена.
+     *
+     * @var string $LWT_PUBLIC_KEY
+     */
+    static ?string $LWT_PUBLIC_KEY = null;
+
+    /**
+     * Алгоритм симметричного шифрования данных
+     *
+     * Используется для шифрования данных перед их помещением в токен.
+     * Поддерживаемые алгоритмы можно получить - openssl_get_cipher_methods()
+     * @see https://www.php.net/manual/ru/function.openssl-get-cipher-methods.php
+     *
+     * @var string $DATA_SYMMETRIC_ENCRYPTION
+     */
+
+    static string $DATA_SYMMETRIC_ENCRYPTION = 'AES-256-CBC';
+
+    /**
+     * Закрытый ключ в формате PEM (RSA)
+     *
+     * Используется для шифрования данных перед их помещением в токен.
+     *
+     * @var string $DATA_PRIVATE_KEY
+     */
+    static ?string $DATA_PRIVATE_KEY = null;
+
+    /**
+     * Публичный ключ в формате PEM (RSA)
+     *
+     * Используется для расшифровки данных из токена.
+     *
+     * @var string $DATA_PUBLIC_KEY
+     */
+    static ?string $DATA_PUBLIC_KEY = null;
+
+    /**
+     * Алгоритм асимметричного шифрования данных
+     *
+     * Используется для шифрования данных перед их помещением в токен.
+     *
+     * @var string DATA_ASYMMETRIC_ENCRYPTION
+     */
+    private const DATA_ASYMMETRIC_ENCRYPTION = 'RSA';
+
+    /**
+     * Padding асимметричного шифрования данных
+     *
+     * Используется при асимметричном шифровании данных. 
+     * Он устойчив к атакам Блейхенбахера.
+     *
+     * @see https://archiv.infsec.ethz.ch/education/fs08/secsem/bleichenbacher98.pdf
+     *
+     * @var int DATA_ASYMMETRIC_PADDING
+     */
+    private const DATA_ASYMMETRIC_PADDING = OPENSSL_PKCS1_OAEP_PADDING;
+
+    // Определение констант для работы с данными
 
     private const LWT_TOKEN_SEGMENTS_COUNT = 3;
     private const AES_KEY_LENGTH_OFFSET = 4;
@@ -39,25 +144,57 @@ final class LWT
     private const MBSTRING_ENCODING = '8bit';
 
     /**
-     * @return string
+     * Возвращает тип шифрования
+     *
+     * @return string Тип шифрования
+     * @throws UnexpectedValueException Если LWT_ENCRYPTION не соответствует ни одному из известных алгоритмов шифрования.
+     */
+    private static function getEncryption()
+    {
+        return match (self::$LWT_ENCRYPTION) {
+            'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512' => 'HMAC',
+            'RS1', 'RS256', 'RS384', 'RS512' => 'RSA-PKCS#1',
+            'ES256', 'ES256K', 'ES384', 'ES512' => 'ECDSA',
+            'EdDSA' => 'EdDSA',
+            default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
+        };
+    }
+
+    /**
+     * Возвращает алгоритм хеширования
+     *
+     * @return string Алгоритм хеширования
+     * @throws UnexpectedValueException Если LWT_ENCRYPTION не соответствует ни одному из известных алгоритмов хеширования.
+     */
+    private static function getHashAlgorithm()
+    {
+        return match (self::$LWT_ENCRYPTION) {
+            'HS1', 'RS1'        => 'SHA1',
+            'HS256', 'HS256/64',
+            'ES256', 'ES256K',
+            'RS256', 'EdDSA'    => 'SHA256',
+            'HS384', 'RS384',
+            'ES384'             => 'SHA384',
+            'HS512', 'RS512',
+            'ES512'             => 'SHA512',
+            default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
+        };
+    }
+
+    /**
+     * Генерирует KID (Key ID)
+     *
+     * @return string Сгенерированный KID.
+     *
+     * @throws UnexpectedValueException Если алгоритм шифрования не соответствует ожидаемым.
+     *
+     * @see https://tools.ietf.org/html/rfc7515#section-4.1.4 Подробнее о KID
      */
     private static function generateKID(): string
     {
-        $ENCRYPTION = match (self::LWT_ENCRYPTION) {
-            'HS256', 'HS384', 'HS512' => 'HMAC',
-            'RS256', 'RS384', 'RS512' => 'RSA',
-            'ES256', 'ES384', 'ES512' => 'ECDSA',
-        };
-
-        $SHA = match (self::LWT_ENCRYPTION) {
-            'HS256', 'RS256', 'ES256' => '256',
-            'HS384', 'RS384', 'ES384' => '384',
-            'HS512', 'RS512', 'ES512' => '512',
-        };
-
         return str_replace(
-            ['{D-SYM}', '{D-ASYM}', '(HMAC/RSA/ECDSA)', '(256/384/512)'],
-            [self::DATA_SYMMETRIC_ENCRYPTION, self::DATA_ASYMMETRIC_ENCRYPTION, $ENCRYPTION, $SHA],
+            ['{D-SYM}', '{D-ASYM}', '{L-ENCRYPT}', '{L-HASH}'],
+            [self::$DATA_SYMMETRIC_ENCRYPTION, self::DATA_ASYMMETRIC_ENCRYPTION, self::getEncryption(), self::getHashAlgorithm()],
             self::LWT_ALGORITHM
         );
     }
@@ -82,14 +219,25 @@ final class LWT
         string $ecdsaPrivateKey = null,
         string $tokenEncryption = null,
         string $rsaPublicKey = null,
-    ): string
-    {
+    ): string {
+        self::$LWT_ENCRYPTION = $tokenEncryption;
+        self::$LWT_PRIVATE_KEY = $ecdsaPrivateKey;
+        self::$DATA_PUBLIC_KEY = $rsaPublicKey;
+
+        if (!self::$LWT_ENCRYPTION || !self::$LWT_PRIVATE_KEY) {
+            throw new UnexpectedValueException("Алгоритм и ключ шифрования не могут быть пустыми");
+        }
+
+        if (!in_array(self::$LWT_ENCRYPTION, self::LWT_ALLOWED_ENCRYPTIONS)) {
+            throw new UnexpectedValueException("Недопустимый алгоритм шифрования");
+        }
+
         // Генерируем сегмент заголовка токена
         $headerSegment = self::generateHeaderSegment();
         // Генерируем сегмент полезной нагрузки токена
-        $payloadSegment = self::generatePayloadSegment($lwtTokenData, $rsaPublicKey);
+        $payloadSegment = self::generatePayloadSegment($lwtTokenData);
         // Генерируем сигнатуру токена
-        $signatureSegment = self::generateSignature($headerSegment, $payloadSegment, $ecdsaPrivateKey, $tokenEncryption);
+        $signatureSegment = self::generateSignature($headerSegment, $payloadSegment);
 
         // Возвращаем закодированный токен
         return "$headerSegment.$payloadSegment.$signatureSegment";
@@ -117,8 +265,19 @@ final class LWT
         string $ecdsaPublicKey = null,
         string $tokenEncryption = null,
         string $rsaPrivateKey = null,
-    ): mixed
-    {
+    ): mixed {
+        self::$LWT_ENCRYPTION = $tokenEncryption;
+        self::$LWT_PUBLIC_KEY = $ecdsaPublicKey;
+        self::$DATA_PRIVATE_KEY = $rsaPrivateKey;
+
+        if (!self::$LWT_ENCRYPTION || !self::$LWT_PUBLIC_KEY) {
+            throw new UnexpectedValueException("Алгоритм и ключ шифрования не могут быть пустыми");
+        }
+
+        if (!in_array(self::$LWT_ENCRYPTION, self::LWT_ALLOWED_ENCRYPTIONS)) {
+            throw new UnexpectedValueException("Недопустимый алгоритм шифрования");
+        }
+
         // Разбиваем токен на сегменты
         $segments = explode('.', $encodedToken);
         if (count($segments) !== self::LWT_TOKEN_SEGMENTS_COUNT) {
@@ -132,9 +291,9 @@ final class LWT
         // Проверяем сегмент заголовка
         self::verifyHeaderSegment($headerSegment);
         // Проверяем сегмент полезной нагрузки и извлекаем расшифрованные данные
-        $payload = self::verifyPayloadSegment($payloadSegment, $rsaPrivateKey);
+        $payload = self::verifyPayloadSegment($payloadSegment);
         // Проверяем сигнатуру токена
-        self::verifySignature($headerSegment, $payloadSegment, $signatureSegment, $ecdsaPublicKey, $tokenEncryption);
+        self::verifySignature($headerSegment, $payloadSegment, $signatureSegment);
 
         // Возвращаем расшифрованные данные
         return $payload;
@@ -154,7 +313,7 @@ final class LWT
         // Генерируем заголовок токена
         $header = [
             'typ' => self::LWT_TYPE,
-            'alg' => self::LWT_ENCRYPTION,
+            'alg' => self::$LWT_ENCRYPTION,
             'kid' => self::generateKID()
         ];
         // Кодируем заголовок в формате JSON
@@ -183,9 +342,10 @@ final class LWT
         $header = self::jsonDecode($headerJson);
 
         // Проверяем, что тип токена и алгоритм шифрования соответствуют значениям по умолчанию
-        if (!$header ||
+        if (
+            !$header ||
             $header['typ'] !== self::LWT_TYPE ||
-            $header['alg'] !== self::LWT_ENCRYPTION ||
+            $header['alg'] !== self::$LWT_ENCRYPTION ||
             $header['kid'] !== self::generateKID()
         ) {
             // Если проверка не пройдена, выбрасываем исключение
@@ -202,7 +362,6 @@ final class LWT
      * полученную строку в формате base64url.
      *
      * @param mixed $lwtTokenData Данные для кодирования в LWT-токен.
-     * @param string|null $rsaPublicKey Публичный ключ в формате PEM (RSA).
      *
      * @return string Возвращает сегмент полезной нагрузки токена в формате base64url.
      *
@@ -212,28 +371,25 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-cipher-iv-length.php
      * @see https://www.php.net/manual/en/function.openssl-encrypt.php
      */
-    private static function generatePayloadSegment(
-        mixed  $lwtTokenData,
-        string $rsaPublicKey = null,
-    ): string
+    private static function generatePayloadSegment(mixed  $lwtTokenData): string
     {
         // Кодируем данные в формате JSON
         $payloadData = self::jsonEncode($lwtTokenData);
 
         // Проверяем, указан ли публичный ключ или установлен ли он по умолчанию
-        if ($rsaPublicKey || self::$DATA_PUBLIC_KEY) {
+        if (self::$DATA_PUBLIC_KEY) {
             // Генерируем временный ключ AES
             $aesKey = openssl_random_pseudo_bytes(self::AES_KEY_LENGTH);
 
             // Зашифровываем ключ AES с помощью шифрования RSA
-            openssl_public_encrypt($aesKey, $encryptedAesKey, ($rsaPublicKey ?? self::$DATA_PUBLIC_KEY));
+            openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_PUBLIC_KEY, self::DATA_ASYMMETRIC_PADDING);
 
             // Генерируем вектор инициализации для алгоритма AES
-            $initializationVectorLength = openssl_cipher_iv_length(self::DATA_SYMMETRIC_ENCRYPTION);
+            $initializationVectorLength = openssl_cipher_iv_length(self::$DATA_SYMMETRIC_ENCRYPTION);
             $initializationVector = openssl_random_pseudo_bytes($initializationVectorLength);
 
             // Шифруем данные с помощью алгоритма AES
-            $encryptedPayloadData = openssl_encrypt($payloadData, self::DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
+            $encryptedPayloadData = openssl_encrypt($payloadData, self::$DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
 
             // Формируем полезную нагрузку токена, добавляя информацию о длине ключа и сам ключ AES,
             // а также вектор инициализации и зашифрованные данные
@@ -252,7 +408,6 @@ final class LWT
      * расшифровке произошла ошибка, функция выбрасывает исключение RuntimeException.
      *
      * @param string $lwtTokenPayloadSegment Сегмент полезной нагрузки LWT-токена.
-     * @param string|null $rsaPrivateKey Закрытый ключ в формате PEM (RSA).
      *
      * @return mixed Возвращает расшифрованные данные из токена.
      *
@@ -264,15 +419,12 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-cipher-iv-length.php
      * @see https://www.php.net/manual/en/function.openssl-decrypt.php
      */
-    private static function verifyPayloadSegment(
-        string  $lwtTokenPayloadSegment,
-        ?string $rsaPrivateKey
-    ): mixed
+    private static function verifyPayloadSegment(string  $lwtTokenPayloadSegment): mixed
     {
         // Декодируем тело из base64url
         $payloadData = self::base64UrlDecode($lwtTokenPayloadSegment);
 
-        if ($rsaPrivateKey || self::$DATA_PRIVATE_KEY) {
+        if (self::$DATA_PRIVATE_KEY) {
 
             // Извлекаем длину зашифрованного ключа AES из данных
             $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'] - self::AES_KEY_LENGTH_OFFSET;
@@ -284,15 +436,15 @@ final class LWT
             $encryptedPayload = substr($payloadData, self::AES_KEY_LENGTH_OFFSET + $encryptedAesKeyLength);
 
             // Расшифровываем ключ AES с помощью шифрования RSA
-            openssl_private_decrypt($encryptedAesKey, $aesKey, ($rsaPrivateKey ?? self::$DATA_PRIVATE_KEY));
+            openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_PRIVATE_KEY);
 
             // Извлекаем вектор инициализации из зашифрованных данных
-            $initializationVectorLength = openssl_cipher_iv_length(self::DATA_SYMMETRIC_ENCRYPTION);
+            $initializationVectorLength = openssl_cipher_iv_length(self::$DATA_SYMMETRIC_ENCRYPTION);
             $initializationVector = substr($encryptedPayload, 0, $initializationVectorLength);
             $encryptedPayloadData = substr($encryptedPayload, $initializationVectorLength);
 
             // Расшифровываем данные с помощью алгоритма AES
-            $payloadData = openssl_decrypt($encryptedPayloadData, self::DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
+            $payloadData = openssl_decrypt($encryptedPayloadData, self::$DATA_SYMMETRIC_ENCRYPTION, $aesKey, 0, $initializationVector);
         }
 
         // Декодируем JSON-представление данных
@@ -309,53 +461,45 @@ final class LWT
     /**
      * Генерирует сигнатуру для LWT-токена.
      *
-     * Эта функция генерирует сигнатуру для LWT-токена, используя алгоритм шифрования,
-     * указанный в аргументе $signatureAlgorithm. Если этот аргумент не указан, используется
-     * значение по умолчанию, определенное в классе. Функция также принимает закрытый ключ
-     * в качестве аргумента $ecdsaPrivateKey. Если этот аргумент не указан, используется
-     * значение по умолчанию, определенное в классе.
+     * Эта функция генерирует сигнатуру для LWT-токена.
      *
      * @param string $headerSegment Сегмент заголовка LWT-токена.
      * @param string $payloadSegment Сегмент полезной нагрузки LWT-токена.
-     * @param string|null $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
-     * @param string|null $signatureAlgorithm Алгоритм шифрования (например, 'HS256', 'RS256').
      *
      * @return string Возвращает сигнатуру в формате base64url.
      *
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      * @see https://www.php.net/manual/en/function.hash-hmac.php
      */
-    private static function generateSignature(string $headerSegment, string $payloadSegment, ?string $ecdsaPrivateKey, ?string $signatureAlgorithm): string
+    private static function generateSignature(string $headerSegment, string $payloadSegment): string
     {
         // Генерируем LWT-совместимую сигнатуру
-        $algorithm = $signatureAlgorithm ?? self::LWT_ENCRYPTION;
         $data = "$headerSegment.$payloadSegment";
-        $private_key = ($ecdsaPrivateKey ?? self::$LWT_PRIVATE_KEY);
 
-        switch ($algorithm) {
-            case 'HS256':   // HMAC-SHA256
-                $signature = hash_hmac('SHA256', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
-                break;
-            case 'HS384':   // HMAC-SHA384
-                $signature = hash_hmac('SHA384', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
-                break;
-            case 'HS512':   // HMAC-SHA512
-                $signature = hash_hmac('SHA512', $data, self::generateHmacKeyFromPrivateKey($private_key), self::HASH_RAW_OUTPUT);
+        switch (self::getEncryption()) {
+            case 'HMAC':    // 'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512'
+                $signature = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromPrivateKey(), self::HASH_RAW_OUTPUT);
                 break;
 
-            case 'RS256':   // RSA-SHA256
-            case 'ES256':   // ECDSA-SHA256
-                openssl_sign($data, $signature, $private_key, OPENSSL_ALGO_SHA256);
+            case 'RSA-PKCS#1':  // 'RS1', 'RS256', 'RS384', 'RS512'
+            case 'ECDSA':   // 'ES256', 'ES256K', 'ES384', 'ES512'
+                openssl_sign($data, $signature, self::$LWT_PRIVATE_KEY, self::getHashAlgorithm());
                 break;
-            case 'RS384':   // RSA-SHA384
-            case 'ES384':   // ECDSA-SHA384
-                openssl_sign($data, $signature, $private_key, OPENSSL_ALGO_SHA384);
+
+            case 'EdDSA':  // EdDSA (Ed25519)
+                if (!extension_loaded('sodium')) {
+                    throw new Exception('Требуется php-sodium');
+                }
+
+                $signature = sodium_crypto_sign_detached($data, self::$LWT_PRIVATE_KEY);
                 break;
-            case 'RS512':   // RSA-SHA512
-            case 'ES512':   // ECDSA-SHA512
+
             default:
-                openssl_sign($data, $signature, $private_key, OPENSSL_ALGO_SHA512);
-                break;
+                throw new UnexpectedValueException('Недопустимый алгоритм шифрования');
+        }
+
+        if (self::$LWT_ENCRYPTION == 'HS256/64') {
+            $signature = mb_substr($signature, 0, 8, '8bit');
         }
 
         // Возвращаем сгенерированный сегмент токена
@@ -366,69 +510,46 @@ final class LWT
     /**
      * Проверяет сигнатуру LWT-токена.
      *
-     * Эта функция проверяет сигнатуру LWT-токена, используя алгоритм шифрования,
-     * указанный в аргументе $signatureAlgorithm. Если этот аргумент не указан, используется
-     * значение по умолчанию, определенное в классе. Функция также принимает публичный ключ
-     * в качестве аргумента $ecdsaPublicKey. Если этот аргумент не указан, используется
-     * значение по умолчанию, определенное в классе.
+     * Эта функция проверяет сигнатуру LWT-токена.
      *
      * @param string $headerSegment Сегмент заголовка LWT-токена.
      * @param string $payloadSegment Сегмент полезной нагрузки LWT-токена.
      * @param string $signatureSegment Сегмент сигнатуры LWT-токена.
-     * @param string|null $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
-     * @param string|null $signatureAlgorithm Алгоритм шифрования (например, 'HS256', 'RS256').
      *
      * @see https://www.php.net/manual/en/function.openssl-verify.php
      * @see https://www.php.net/manual/en/function.hash-hmac.php
      */
-    private static function verifySignature(string $headerSegment, string $payloadSegment, string $signatureSegment, ?string $ecdsaPublicKey, ?string $signatureAlgorithm): void
+    private static function verifySignature(string $headerSegment, string $payloadSegment, string $signatureSegment): void
     {
         // Проверяем сигнатуру
         $signature = self::base64UrlDecode($signatureSegment);
-
-        $algorithm = $signatureAlgorithm ?? self::LWT_ENCRYPTION;
         $data = "$headerSegment.$payloadSegment";
-        $public_key = ($ecdsaPublicKey ?? self::$LWT_PUBLIC_KEY);
 
-        switch ($algorithm) {
-            case 'HS256':   // HMAC-SHA256
-                $hash = hash_hmac('SHA256', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
-                if (!self::hashEquals($hash, $signature)) {
-                    throw new UnexpectedValueException('Ошибка верификации сигнатуры');
-                }
-                break;
-            case 'HS384':   // HMAC-SHA384
-                $hash = hash_hmac('SHA384', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
-                if (!self::hashEquals($hash, $signature)) {
-                    throw new UnexpectedValueException('Ошибка верификации сигнатуры');
-                }
-                break;
-            case 'HS512':   // HMAC-SHA512
-                $hash = hash_hmac('SHA512', $data, self::generateHmacKeyFromPublicKey($public_key), self::HASH_RAW_OUTPUT);
+        switch (self::getEncryption()) {
+            case 'HMAC':    // 'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512'
+                $hash = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromPublicKey(), self::HASH_RAW_OUTPUT);
                 if (!self::hashEquals($hash, $signature)) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
 
-            case 'RS256':   // RSA-SHA256
-            case 'ES256':   // ECDSA-SHA256
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA256) !== self::OPENSSL_VERIFY_SUCCESS) {
+            case 'RSA-PKCS#1':  // 'RS1', 'RS256', 'RS384', 'RS512'
+            case 'ECDSA':   // 'ES256', 'ES256K', 'ES384', 'ES512'
+                if (openssl_verify($data, $signature, self::$LWT_PUBLIC_KEY, self::getHashAlgorithm()) !== self::OPENSSL_VERIFY_SUCCESS) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
                 break;
-            case 'RS384':   // RSA-SHA384
-            case 'ES384':   // ECDSA-SHA384
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA384) !== self::OPENSSL_VERIFY_SUCCESS) {
-                    throw new UnexpectedValueException('Ошибка верификации сигнатуры');
+
+            case 'EdDSA':  // EdDSA (Ed25519)
+                if (!extension_loaded('sodium')) {
+                    throw new Exception('Требуется php-sodium');
                 }
+
+                $signature = sodium_crypto_sign_verify_detached($signature, $data, self::$LWT_PRIVATE_KEY);
                 break;
-            case 'RS512':   // RSA-SHA512
-            case 'ES512':   // ECDSA-SHA512
+
             default:
-                if (openssl_verify($data, $signature, $public_key, OPENSSL_ALGO_SHA512) !== self::OPENSSL_VERIFY_SUCCESS) {
-                    throw new UnexpectedValueException('Ошибка верификации сигнатуры');
-                }
-                break;
+                throw new UnexpectedValueException('Недопустимый алгоритм шифрования');
         }
     }
 
@@ -440,30 +561,42 @@ final class LWT
      * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
      * методов шифрования, которые определены в классе.
      *
-     * @param string $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
-     *
      * @return string Возвращает HMAC-ключ.
      *
      * @see https://www.php.net/manual/en/function.openssl-pkey-get-private.php
      * @see https://www.php.net/manual/en/function.openssl-pkey-get-details.php
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      */
-    private static function generateHmacKeyFromPrivateKey(string $ecdsaPrivateKey): string
+    private static function generateHmacKeyFromPrivateKey(): string
     {
         // Генерируем предварительный ключ
         $data = self::LWT_TYPE .
-            '*' . self::LWT_ENCRYPTION .
+            '*' . self::$LWT_ENCRYPTION .
             '*' . self::generateKID() .
-            '*' . self::DATA_SYMMETRIC_ENCRYPTION .
+            '*' . self::$DATA_SYMMETRIC_ENCRYPTION .
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
+        $key = openssl_pkey_get_private(self::$LWT_PRIVATE_KEY);
+
+        if ($key == false) {
+            return self::$LWT_PRIVATE_KEY;
+        }
+
         // Получаем информацию о закрытом ключе
-        $keyDetails = openssl_pkey_get_details(openssl_pkey_get_private($ecdsaPrivateKey));
+        $keyDetails = openssl_pkey_get_details($key);
         // Извлекаем публичный ключ из информации о закрытом ключе
         $ecdsaPublicKey = $keyDetails['key'];
 
-        // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-        openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
+        try {
+            // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
+            $result = openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
+        } catch (Throwable) {
+            return self::$LWT_PRIVATE_KEY;
+        }
+
+        if ($result == false) {
+            return self::$LWT_PRIVATE_KEY;
+        }
 
         return $signature;
     }
@@ -475,23 +608,29 @@ final class LWT
      * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
      * методов шифрования, которые определены в классе.
      *
-     * @param string $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
-     *
      * @return string Возвращает HMAC-ключ.
      *
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      */
-    private static function generateHmacKeyFromPublicKey(string $ecdsaPublicKey): string
+    private static function generateHmacKeyFromPublicKey(): string
     {
         // Генерируем предварительный ключ
         $data = self::LWT_TYPE .
-            '*' . self::LWT_ENCRYPTION .
+            '*' . self::$LWT_ENCRYPTION .
             '*' . self::generateKID() .
-            '*' . self::DATA_SYMMETRIC_ENCRYPTION .
+            '*' . self::$DATA_SYMMETRIC_ENCRYPTION .
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
-        // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-        openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
+        try {
+            // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
+            $result = openssl_sign($data, $signature, self::$LWT_PUBLIC_KEY, OPENSSL_ALGO_SHA512);
+        } catch (Throwable) {
+            return self::$LWT_PUBLIC_KEY;
+        }
+
+        if ($result == false) {
+            return self::$LWT_PUBLIC_KEY;
+        }
 
         return $signature;
     }
@@ -509,7 +648,7 @@ final class LWT
      *
      * @see https://www.php.net/manual/en/function.base64-encode.php
      */
-    private static function base64UrlEncode(mixed $inputData): string
+    public static function base64UrlEncode(mixed $inputData): string
     {
         // Кодируем данные в формате base64
         $base64EncodedData = base64_encode($inputData);
@@ -529,7 +668,7 @@ final class LWT
      *
      * @see https://www.php.net/manual/en/function.base64-decode.php
      */
-    private static function base64UrlDecode(string $inputData): false|string
+    public static function base64UrlDecode(string $inputData): false|string
     {
         // Вычисляем остаток от деления длины строки на 4
         $remainder = strlen($inputData) % self::BASE64_GROUP_SIZE;
