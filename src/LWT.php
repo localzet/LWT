@@ -28,7 +28,7 @@ final class LWT
      * @var string TYPE
      */
     private const TYPE = 'LWTv3';
-    
+
     /**
      * Допустимые алгоритмы шифрования для данных токена
      *
@@ -127,9 +127,9 @@ final class LWT
 
     // Определение констант для работы с данными
 
-    private const TOKEN_SEGMENTS_COUNT = 3;
     private const AES_KEY_LENGTH_OFFSET = 4;
     private const AES_KEY_LENGTH = 32;
+    private const TOKEN_SEGMENTS_COUNT = 3;
     private const HASH_RAW_OUTPUT = true;
     private const OPENSSL_VERIFY_SUCCESS = 1;
     private const BASE64_GROUP_SIZE = 4;
@@ -152,6 +152,7 @@ final class LWT
             'RS1', 'RS256', 'RS384', 'RS512' => 'RSA-PKCS#1',
             'ES256', 'ES256K', 'ES384', 'ES512' => 'ECDSA',
             'EdDSA' => 'EdDSA',
+
             default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
         };
 
@@ -172,13 +173,11 @@ final class LWT
     {
         $hashAlgorithm = match (self::getClaim('alg')) {
             'HS1', 'RS1' => 'SHA1',
-            'HS256', 'HS256/64',
-            'ES256', 'ES256K',
-            'RS256', 'EdDSA' => 'SHA256',
-            'HS384', 'RS384',
-            'ES384' => 'SHA384',
-            'HS512', 'RS512',
-            'ES512' => 'SHA512',
+            'HS256', 'RS256', 'ES256', 
+            'ES256K', 'HS256/64', 'EdDSA' => 'SHA256',
+            'HS384', 'RS384', 'ES384' => 'SHA384',
+            'HS512', 'RS512', 'ES512' => 'SHA512',
+            
             default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
         };
 
@@ -199,13 +198,13 @@ final class LWT
             'kid' => self::$CLAIM_KID,
             'enc' => self::$DATA_PUBLIC_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null,
 
-            // Утверждения полезной нагрузки
-            // 'iss' => 'Issuer',
-            // 'sub' => 'Subject',
-            // 'aud' => 'Audience',
-            // 'nbf' => 'Not Before',
-            // 'iat' => 'Issued At',
-            // 'jti' => 'JWT ID',
+                // Утверждения полезной нагрузки
+                // 'iss' => 'Issuer',
+                // 'sub' => 'Subject',
+                // 'aud' => 'Audience',
+                // 'nbf' => 'Not Before',
+                // 'iat' => 'Issued At',
+                // 'jti' => 'JWT ID',
 
             default => throw new UnexpectedValueException('Незарегистрированное утверждение JWT')
         };
@@ -231,8 +230,7 @@ final class LWT
         string $ecdsaPrivateKey = null,
         string $tokenEncryption = null,
         string $rsaPublicKey = null,
-    ): string
-    {
+    ): string {
         self::$ALGORITHM = $tokenEncryption;
         self::$PRIVATE_KEY = $ecdsaPrivateKey;
         self::$DATA_PUBLIC_KEY = $rsaPublicKey;
@@ -280,8 +278,7 @@ final class LWT
         string $ecdsaPublicKey = null,
         string $tokenEncryption = null,
         string $rsaPrivateKey = null,
-    ): mixed
-    {
+    ): mixed {
         self::$ALGORITHM = $tokenEncryption;
         self::$PUBLIC_KEY = $ecdsaPublicKey;
         self::$DATA_PRIVATE_KEY = $rsaPrivateKey;
@@ -647,7 +644,8 @@ final class LWT
         $key = openssl_pkey_get_private(self::$PRIVATE_KEY);
 
         if (!$key) {
-            throw new RuntimeException('Ошибка получения закрытого ключа');
+            return self::$PRIVATE_KEY;
+            // throw new RuntimeException('Ошибка получения закрытого ключа');
         }
 
         // Получаем информацию о закрытом ключе
@@ -691,6 +689,10 @@ final class LWT
             '*' . self::$DATA_SYMMETRIC_ENCRYPTION .
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
+            if (!openssl_pkey_get_public(self::$PUBLIC_KEY)) {
+                return self::$PUBLIC_KEY;
+            }
+            
         try {
             // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
             $result = openssl_sign($data, $signature, self::$PUBLIC_KEY, OPENSSL_ALGO_SHA512);
