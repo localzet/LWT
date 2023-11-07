@@ -3,7 +3,8 @@
   "description": "Localzet Web Tokens (JWT-based)",
   "type": "library",
   "keywords": [
-    "localzet", "lwt"
+    "localzet",
+    "lwt"
   ],
   "license": "AGPL-3.0-or-later",
   "authors": [
