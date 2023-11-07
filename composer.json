@@ -20,7 +20,8 @@
   "require": {
     "php": "^8.2",
     "ext-openssl": "*",
-    "ext-mbstring": "*"
+    "ext-mbstring": "*",
+    "ext-sodium": "*"
   },
   "autoload": {
     "psr-4": {
