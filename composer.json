@@ -3,8 +3,7 @@
   "description": "Localzet Web Tokens (JWT-based)",
   "type": "library",
   "keywords": [
-    "localzet",
-    "lwt"
+    "LWT"
   ],
   "license": "AGPL-3.0-or-later",
   "authors": [
@@ -21,8 +20,10 @@
   "require": {
     "php": "^8.2",
     "ext-openssl": "*",
-    "ext-mbstring": "*",
-    "ext-sodium": "*"
+    "ext-mbstring": "*"
+  },
+  "suggest": {
+    "ext-sodium": "For EdDSA"
   },
   "autoload": {
     "psr-4": {
