@@ -57,7 +57,7 @@ final class LWT
     protected static string $ALGORITHM = 'ES512';
 
     /**
-     * Ключ подписи в формате PEM (ECDSA)
+     * Ключ подписи в формате PEM
      *
      * Используется для создания/проверки цифровой подписи токена.
      *
@@ -627,8 +627,8 @@ final class LWT
 
         $key = self::$SIGN_KEY;
 
-        $public = openssl_pkey_get_public($key);
-        $private = openssl_pkey_get_private($key);
+        $public = @openssl_pkey_get_public($key);
+        $private = @openssl_pkey_get_private($key);
 
         if (!$public && !$private) {
             return $key;
