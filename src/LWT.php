@@ -57,22 +57,13 @@ final class LWT
     protected static string $ALGORITHM = 'ES512';
 
     /**
-     * Закрытый ключ в формате PEM (ECDSA)
+     * Ключ подписи в формате PEM (ECDSA)
      *
-     * Используется для создания цифровой подписи токена.
+     * Используется для создания/проверки цифровой подписи токена.
      *
-     * @var string|null $PRIVATE_KEY
+     * @var string|null $SIGN_KEY
      */
-    protected static ?string $PRIVATE_KEY = null;
-
-    /**
-     * Публичный ключ в формате PEM (ECDSA)
-     *
-     * Используется для проверки цифровой подписи токена.
-     *
-     * @var string|null $PUBLIC_KEY
-     */
-    protected static ?string $PUBLIC_KEY = null;
+    protected static ?string $SIGN_KEY = null;
 
     /**
      * Алгоритм симметричного шифрования данных
@@ -87,22 +78,13 @@ final class LWT
     protected static string $DATA_SYMMETRIC_ENCRYPTION = 'AES-256-CBC';
 
     /**
-     * Закрытый ключ в формате PEM (RSA)
+     * Ключ в формате PEM (RSA)
      *
-     * Используется для шифрования данных перед их помещением в токен.
+     * Используется для шифрования/расшифровки данных из токена.
      *
-     * @var string|null $DATA_PRIVATE_KEY
+     * @var string|null $DATA_KEY
      */
-    protected static ?string $DATA_PRIVATE_KEY = null;
-
-    /**
-     * Публичный ключ в формате PEM (RSA)
-     *
-     * Используется для расшифровки данных из токена.
-     *
-     * @var string|null $DATA_PUBLIC_KEY
-     */
-    protected static ?string $DATA_PUBLIC_KEY = null;
+    protected static ?string $DATA_KEY = null;
 
     /**
      * Алгоритм асимметричного шифрования данных
@@ -193,10 +175,10 @@ final class LWT
         return match ($claim) {
             // Утверждения заголовка
             'typ' => self::TYPE,
-            'cty' => self::$DATA_PUBLIC_KEY ? 'LZX' : 'JWS',
+            'cty' => self::$DATA_KEY ? 'LZX' : 'JWS',
             'alg' => self::$ALGORITHM,
             'kid' => self::$CLAIM_KID,
-            'enc' => self::$DATA_PUBLIC_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null,
+            'enc' => self::$DATA_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null,
 
             // Утверждения полезной нагрузки
             // 'iss' => 'Issuer',
@@ -218,25 +200,25 @@ final class LWT
      * Если эти аргументы не указаны, используются значения по умолчанию, определенные в классе.
      *
      * @param mixed $lwtTokenData Данные для кодирования в токен.
-     * @param string|null $ecdsaPrivateKey Закрытый ключ в формате PEM (ECDSA).
+     * @param string|null $signatureKey Закрытый ключ в формате PEM (ECDSA).
      * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
-     * @param string|null $rsaPublicKey Публичный ключ в формате PEM (RSA).
+     * @param string|null $encryptionKey Публичный ключ в формате PEM (RSA).
      *
      * @return string Возвращает строку, представляющую закодированный токен.
      * @throws Exception
      */
     public static function encode(
         mixed  $lwtTokenData,
-        string $ecdsaPrivateKey = null,
+        string $signatureKey = null,
         string $tokenEncryption = null,
-        string $rsaPublicKey = null,
+        string $encryptionKey = null,
     ): string
     {
         self::$ALGORITHM = $tokenEncryption;
-        self::$PRIVATE_KEY = $ecdsaPrivateKey;
-        self::$DATA_PUBLIC_KEY = $rsaPublicKey;
+        self::$SIGN_KEY = $signatureKey;
+        self::$DATA_KEY = $encryptionKey;
 
-        if (!self::$ALGORITHM || !self::$PRIVATE_KEY) {
+        if (!self::$ALGORITHM || !self::$SIGN_KEY) {
             throw new UnexpectedValueException("Алгоритм и ключ шифрования не могут быть пустыми");
         }
 
@@ -263,9 +245,9 @@ final class LWT
      * Если эти аргументы не указаны, используются значения по умолчанию, определенные в классе.
      *
      * @param string $encodedToken Закодированный токен.
-     * @param string|null $ecdsaPublicKey Публичный ключ в формате PEM (ECDSA).
+     * @param string|null $signatureKey Публичный ключ в формате PEM (ECDSA).
      * @param string|null $tokenEncryption Алгоритм шифрования (например, 'HS256', 'RS256').
-     * @param string|null $rsaPrivateKey Закрытый ключ в формате PEM (RSA).
+     * @param string|null $encryptionKey Закрытый ключ в формате PEM (RSA).
      *
      * @return mixed Возвращает расшифрованные данные из токена.
      *
@@ -276,16 +258,16 @@ final class LWT
      */
     public static function decode(
         string $encodedToken,
-        string $ecdsaPublicKey = null,
+        string $signatureKey = null,
         string $tokenEncryption = null,
-        string $rsaPrivateKey = null,
+        string $encryptionKey = null,
     ): mixed
     {
         self::$ALGORITHM = $tokenEncryption;
-        self::$PUBLIC_KEY = $ecdsaPublicKey;
-        self::$DATA_PRIVATE_KEY = $rsaPrivateKey;
+        self::$SIGN_KEY = $signatureKey;
+        self::$DATA_KEY = $encryptionKey;
 
-        if (!self::$ALGORITHM || !self::$PUBLIC_KEY) {
+        if (!self::$ALGORITHM || !self::$SIGN_KEY) {
             throw new UnexpectedValueException("Алгоритм и ключ шифрования не могут быть пустыми");
         }
 
@@ -402,7 +384,7 @@ final class LWT
         $payloadData = self::jsonEncode($lwtTokenData);
 
         // Проверяем, указан ли публичный ключ или установлен ли он по умолчанию
-        if (self::$DATA_PUBLIC_KEY) {
+        if (self::$DATA_KEY) {
             // Генерируем временный ключ AES
             $aesKey = openssl_random_pseudo_bytes(self::AES_KEY_LENGTH);
 
@@ -411,7 +393,7 @@ final class LWT
             }
 
             // Зашифровываем ключ AES с помощью шифрования RSA
-            $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_PUBLIC_KEY, self::DATA_ASYMMETRIC_PADDING);
+            $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
 
             if (!$encrypt) {
                 throw new RuntimeException('Ошибка шифрования ключа AES');
@@ -467,7 +449,7 @@ final class LWT
         // Декодируем тело из base64url
         $payloadData = self::base64UrlDecode($lwtTokenPayloadSegment);
 
-        if (self::$DATA_PRIVATE_KEY) {
+        if (self::$DATA_KEY) {
 
             // Извлекаем длину зашифрованного ключа AES из данных
             $encryptedAesKeyLength = (int)@unpack('Ntotal_length', $payloadData)['total_length'] - self::AES_KEY_LENGTH_OFFSET;
@@ -483,7 +465,7 @@ final class LWT
             $encryptedPayload = substr($payloadData, self::AES_KEY_LENGTH_OFFSET + $encryptedAesKeyLength);
 
             // Расшифровываем ключ AES с помощью шифрования RSA
-            $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_PRIVATE_KEY, self::DATA_ASYMMETRIC_PADDING);
+            $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
 
             if (!$decrypt) {
                 throw new RuntimeException('Ошибка расшифровки ключа AES');
@@ -531,12 +513,12 @@ final class LWT
 
         switch (self::getEncryption()) {
             case 'HMAC':    // 'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512'
-                $signature = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromPrivateKey(), self::HASH_RAW_OUTPUT);
+                $signature = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromSignKey(), self::HASH_RAW_OUTPUT);
                 break;
 
             case 'RSA-PKCS#1':  // 'RS1', 'RS256', 'RS384', 'RS512'
             case 'ECDSA':   // 'ES256', 'ES256K', 'ES384', 'ES512'
-                $success = openssl_sign($data, $signature, self::$PRIVATE_KEY, self::getHashAlgorithm());
+                $success = openssl_sign($data, $signature, self::$SIGN_KEY, self::getHashAlgorithm());
                 if (!$success) {
                     throw new RuntimeException('Ошибка создания подписи');
                 }
@@ -547,7 +529,7 @@ final class LWT
                     throw new Exception('Требуется php-sodium');
                 }
 
-                $signature = sodium_crypto_sign_detached($data, self::$PRIVATE_KEY);
+                $signature = sodium_crypto_sign_detached($data, self::$SIGN_KEY);
                 break;
 
             default:
@@ -588,7 +570,7 @@ final class LWT
 
         switch (self::getEncryption()) {
             case 'HMAC':    // 'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512'
-                $hash = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromPublicKey(), self::HASH_RAW_OUTPUT);
+                $hash = hash_hmac(self::getHashAlgorithm(), $data, self::generateHmacKeyFromSignKey(), self::HASH_RAW_OUTPUT);
                 if (!self::hashEquals($hash, $signature)) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
@@ -596,7 +578,7 @@ final class LWT
 
             case 'RSA-PKCS#1':  // 'RS1', 'RS256', 'RS384', 'RS512'
             case 'ECDSA':   // 'ES256', 'ES256K', 'ES384', 'ES512'
-                $verify = openssl_verify($data, $signature, self::$PUBLIC_KEY, self::getHashAlgorithm());
+                $verify = openssl_verify($data, $signature, self::$SIGN_KEY, self::getHashAlgorithm());
                 if ($verify !== self::OPENSSL_VERIFY_SUCCESS) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
@@ -607,7 +589,7 @@ final class LWT
                     throw new Exception('Требуется php-sodium');
                 }
 
-                $verify = sodium_crypto_sign_verify_detached($signature, $data, self::$PRIVATE_KEY);
+                $verify = sodium_crypto_sign_verify_detached($signature, $data, self::$SIGN_KEY);
                 if (!$verify) {
                     throw new UnexpectedValueException('Ошибка верификации сигнатуры');
                 }
@@ -619,9 +601,9 @@ final class LWT
     }
 
     /**
-     * Генерирует HMAC-ключ из закрытого ключа.
+     * Генерирует HMAC-ключ из ключа подписи.
      *
-     * Эта функция использует закрытый ключ для генерации HMAC-ключа. Она также использует
+     * Эта функция использует ключ подписи для генерации HMAC-ключа. Она также использует
      * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
      * методов шифрования, которые определены в классе.
      *
@@ -634,7 +616,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-pkey-get-details.php
      * @see https://www.php.net/manual/en/function.openssl-sign.php
      */
-    protected static function generateHmacKeyFromPrivateKey(): string
+    protected static function generateHmacKeyFromSignKey(): string
     {
         // Генерируем предварительный ключ
         $data = self::getClaim('typ') .
@@ -643,61 +625,25 @@ final class LWT
             '*' . self::$DATA_SYMMETRIC_ENCRYPTION .
             '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
 
-        $key = openssl_pkey_get_private(self::$PRIVATE_KEY);
+        $key = self::$SIGN_KEY;
 
-        if (!$key) {
-            return self::$PRIVATE_KEY;
-            // throw new RuntimeException('Ошибка получения закрытого ключа');
+        $public = openssl_pkey_get_public($key);
+        $private = openssl_pkey_get_private($key);
+
+        if (!$public && !$private) {
+            return $key;
         }
 
-        // Получаем информацию о закрытом ключе
-        $keyDetails = openssl_pkey_get_details($key);
-        // Извлекаем публичный ключ из информации о закрытом ключе
-        $ecdsaPublicKey = $keyDetails['key'];
-
-        try {
-            // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-            $result = openssl_sign($data, $signature, $ecdsaPublicKey, OPENSSL_ALGO_SHA512);
-        } catch (Throwable $e) {
-            throw new RuntimeException('Ошибка создания подписи: ' . $e->getMessage());
-        }
-
-        if (!$result) {
-            throw new RuntimeException('Ошибка создания подписи');
-        }
-
-        return $signature;
-    }
-
-    /**
-     * Генерирует HMAC-ключ из публичного ключа.
-     *
-     * Эта функция использует публичный ключ для генерации HMAC-ключа. Она также использует
-     * значения по умолчанию для типа токена, алгоритма шифрования, симметричного и асимметричного
-     * методов шифрования, которые определены в классе.
-     *
-     * @return string Возвращает HMAC-ключ.
-     *
-     * @throws RuntimeException Ошибка создания подписи.
-     *
-     * @see https://www.php.net/manual/en/function.openssl-sign.php
-     */
-    protected static function generateHmacKeyFromPublicKey(): string
-    {
-        // Генерируем предварительный ключ
-        $data = self::getClaim('typ') .
-            '*' . self::getClaim('cty') .
-            '*' . self::getClaim('alg') .
-            '*' . self::$DATA_SYMMETRIC_ENCRYPTION .
-            '*' . self::DATA_ASYMMETRIC_ENCRYPTION;
-
-        if (!openssl_pkey_get_public(self::$PUBLIC_KEY)) {
-            return self::$PUBLIC_KEY;
+        if ($private) {
+            // Получаем информацию о закрытом ключе
+            $keyDetails = openssl_pkey_get_details($private);
+            // Извлекаем публичный ключ из информации о закрытом ключе
+            $key = $keyDetails['key'];
         }
 
         try {
-            // Генерируем криптографическую подпись с использованием публичного ключа и алгоритма SHA-512
-            $result = openssl_sign($data, $signature, self::$PUBLIC_KEY, OPENSSL_ALGO_SHA512);
+            // Генерируем криптографическую подпись с использованием ключа и алгоритма SHA-512
+            $result = openssl_sign($data, $signature, $key, OPENSSL_ALGO_SHA512);
         } catch (Throwable $e) {
             throw new RuntimeException('Ошибка создания подписи: ' . $e->getMessage());
         }
