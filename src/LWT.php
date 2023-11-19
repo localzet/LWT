@@ -393,10 +393,16 @@ final class LWT
             }
 
             // Зашифровываем ключ AES с помощью шифрования RSA
-            $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            if (@openssl_pkey_get_public(self::$DATA_KEY)) {
+                $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            } elseif (@openssl_pkey_get_private(self::$DATA_KEY)) {
+                $encrypt = openssl_private_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            } else {
+                throw new RuntimeException('Ошибка ключа RSA');
+            }
 
             if (!$encrypt) {
-                throw new RuntimeException('Ошибка шифрования ключа AES');
+                throw new RuntimeException('Ошибка шифрования ключа AES: ' . openssl_error_string());
             }
 
             // Генерируем вектор инициализации для алгоритма AES
@@ -465,10 +471,16 @@ final class LWT
             $encryptedPayload = substr($payloadData, self::AES_KEY_LENGTH_OFFSET + $encryptedAesKeyLength);
 
             // Расшифровываем ключ AES с помощью шифрования RSA
-            $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            if (@openssl_pkey_get_public(self::$DATA_KEY)) {
+                $decrypt = openssl_public_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            } elseif (@openssl_pkey_get_private(self::$DATA_KEY)) {
+                $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+            } else {
+                throw new RuntimeException('Ошибка ключа RSA');
+            }
 
             if (!$decrypt) {
-                throw new RuntimeException('Ошибка расшифровки ключа AES');
+                throw new RuntimeException('Ошибка расшифровки ключа AES: ' . openssl_error_string());
             }
 
             // Извлекаем вектор инициализации из зашифрованных данных
