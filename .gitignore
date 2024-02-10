@@ -182,85 +182,85 @@ build/Release
 node_modules/
 jspm_packages/
 
-# Snowpack dependency directory (https://snowpack.dev/)
+### Snowpack ###
 web_modules/
 
-# TypeScript cache
+### TypeScript ###
 *.tsbuildinfo
 
-# Optional npm cache directory
+### npm ###
 .npm
 
-# Optional eslint cache
+### eslint ###
 .eslintcache
 
-# Optional stylelint cache
+### stylelint ###
 .stylelintcache
 
-# Microbundle cache
+### Microbundle ###
 .rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
 
-# Optional REPL history
+### REPL history ###
 .node_repl_history
 
-# Output of 'npm pack'
+### npm pack ###
 *.tgz
 
-# Yarn Integrity file
+### Yarn ###
 .yarn-integrity
 
-# dotenv environment variable files
+### dotenv ###
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
 
-# parcel-bundler cache (https://parceljs.org/)
+### parcel-bundler ###
 .cache
 .parcel-cache
 
-# Next.js build output
+### Next.js ###
 .next
 out
 
-# Nuxt.js build / generate output
+### Nuxt.js ###
 .nuxt
 dist
 
-# Gatsby files
+### Gatsby ###
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
+# Раскомментируйте строку public, если ваш проект использует Gatsby, а не Next.js
 # https://nextjs.org/blog/next-9-1#public-directory-support
 # public
 
-# vuepress build output
+### vuepress ###
 .vuepress/dist
 
-# vuepress v2.x temp and cache directory
+### vuepress v2.x ###
 .temp
 
-# Docusaurus cache and generated files
+### Docusaurus ###
 .docusaurus
 
-# Serverless directories
+### Serverless ###
 .serverless/
 
-# FuseBox cache
+### FuseBox ###
 .fusebox/
 
-# DynamoDB Local files
+### DynamoDB Local ###
 .dynamodb/
 
-# TernJS port file
+### TernJS ###
 .tern-port
 
-# Stores VSCode versions used for testing VSCode extensions
+### VSCode versions for testing extensions ###
 .vscode-test
 
-# yarn v2
+### yarn v2 ###
 .yarn/cache
 .yarn/unplugged
 .yarn/build-state.yml
@@ -268,32 +268,29 @@ dist
 .pnp.*
 
 ### Node Patch ###
-# Serverless Webpack directories
 .webpack/
 
-# Optional stylelint cache
-
-# SvelteKit build / generate output
+### SvelteKit ###
 .svelte-kit
 
 ### PhpStorm ###
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+# Охватывает IDE JetBrains: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm и Rider
+# Ссылка: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
-# User-specific stuff
+# Пользовательские вещи
 
-# AWS User-specific
+# AWS Пользовательские
 
-# Generated files
+# Сгенерированные файлы
 
-# Sensitive or high-churn files
+# Чувствительные или файлы с высоким оборотом
 
 # Gradle
 
-# Gradle and Maven with auto-import
-# When using Gradle or Maven with auto-import, you should exclude module files,
-# since they will be recreated, and may cause churn.  Uncomment if using
-# auto-import.
+# Gradle и Maven с авто-импортом
+# При использовании Gradle или Maven с авто-импортом, вы должны исключить файлы модулей,
+# так как они будут воссозданы и могут вызвать колебания. Раскомментируйте, если используете
+# авто-импорт.
 # .idea/artifacts
 # .idea/compiler.xml
 # .idea/jarRepositories.xml
@@ -305,57 +302,57 @@ dist
 
 # CMake
 
-# Mongo Explorer plugin
+# Плагин Mongo Explorer
 
-# File-based project format
+# Формат проекта на основе файлов
 
 # IntelliJ
 
-# mpeltonen/sbt-idea plugin
+# Плагин mpeltonen/sbt-idea
 
-# JIRA plugin
+# Плагин JIRA
 
-# Cursive Clojure plugin
+# Плагин Cursive Clojure
 
-# SonarLint plugin
+# Плагин SonarLint
 
-# Crashlytics plugin (for Android Studio and IntelliJ)
+# Плагин Crashlytics (для Android Studio и IntelliJ)
 
-# Editor-based Rest Client
+# Редактор на основе Rest Client
 
-# Android studio 3.1+ serialized cache file
+# Сериализованный файл кэша Android studio 3.1+
 
 ### PhpStorm Patch ###
-# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+# Причина комментария: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
 
 # *.iml
 # modules.xml
 # .idea/misc.xml
 # *.ipr
 
-# Sonarlint plugin
+# Плагин Sonarlint
 # https://plugins.jetbrains.com/plugin/7973-sonarlint
 
-# SonarQube Plugin
+# Плагин SonarQube
 # https://plugins.jetbrains.com/plugin/7238-sonarqube-community-plugin
 
-# Markdown Navigator plugin
+# Плагин Markdown Navigator
 # https://plugins.jetbrains.com/plugin/7896-markdown-navigator-enhanced
 
-# Cache file creation bug
-# See https://youtrack.jetbrains.com/issue/JBR-2257
+# Ошибка создания файла кэша
+# См. https://youtrack.jetbrains.com/issue/JBR-2257
 
-# CodeStream plugin
+# Плагин CodeStream
 # https://plugins.jetbrains.com/plugin/12206-codestream
 
-# Azure Toolkit for IntelliJ plugin
+# Плагин Azure Toolkit for IntelliJ
 # https://plugins.jetbrains.com/plugin/8053-azure-toolkit-for-intellij
 
 ### PHPUnit ###
-# Covers PHPUnit
-# Reference: https://phpunit.de/
+# Охватывает PHPUnit
+# Ссылка: https://phpunit.de/
 
-# Generated files
+# Сгенерированные файлы
 .phpunit.result.cache
 .phpunit.cache
 
@@ -363,7 +360,7 @@ dist
 /app/phpunit.xml
 /phpunit.xml
 
-# Build data
+# Данные сборки
 /build/
 
 ### SVN ###
@@ -377,57 +374,65 @@ dist
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
-# Local History for Visual Studio Code
+# Локальная история для Visual Studio Code
 .history/
 
-# Built Visual Studio Code Extensions
+# Собранные расширения Visual Studio Code
 *.vsix
 
-
-
 ### VisualStudioCode Patch ###
-# Ignore all local history of files
+# Игнорировать всю локальную историю файлов
 .history
 .ionide
 
 ### Windows ###
-# Windows thumbnail cache files
+# Файлы кэша миниатюр Windows
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
 
-# Dump file
+# Файл дампа
 *.stackdump
 
-# Folder config file
+# Файл конфигурации папки
 [Dd]esktop.ini
 
-# Recycle Bin used on file shares
+# Корзина для использования на общих файлах
 $RECYCLE.BIN/
 
-# Windows Installer files
+# Файлы установщика Windows
 *.cab
 *.msi
 *.msix
 *.msm
 *.msp
 
-# Windows shortcuts
+# Ярлыки Windows
 *.lnk
 
 
-
-# PPK
-*.ppk
 
 # CSS, SASS, SCSS maps
 *.css.map
 *.sass.map
 *.scss.map
 
+# Dotfiles
+#.*
+!.gitignore
+!.npmignore
+!.babelrc
+!.travis.yml
+
 # PHPUnit and PHPStan
 /phpstan.neon
+
+# PPK
+*.ppk
+
+# Un~
+[._]*.un~
 
 # Vim
 [._]*.s[a-v][a-z]
@@ -438,12 +443,3 @@ $RECYCLE.BIN/
 [._]sw[a-p]
 Session.vim
 Sessionx.vim
-
-# Un~
-[._]*.un~
-
-# Dotfiles
-!.gitignore
-!.npmignore
-!.babelrc
-!.travis.yml
