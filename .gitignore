@@ -2,35 +2,31 @@
 composer.phar
 /vendor/
 
-# Commit your application's lock file https://getcomposer.org/doc/01-basic-usage.md#commit-your-composer-lock-file-to-version-control
-# You may choose to ignore a library lock file http://getcomposer.org/doc/02-libraries.md#lock-file
+# Фиксируйте файл блокировки вашего приложения https://getcomposer.org/doc/01-basic-usage.md#commit-your-composer-lock-file-to-version-control
+# Вы можете выбрать игнорирование файла блокировки библиотеки http://getcomposer.org/doc/02-libraries.md#lock-file
 # composer.lock
-
-
 
 ### dotenv ###
 .env
 
-
-
 ### JetBrains ###
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+# Охватывает IDE JetBrains: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm и Rider
+# Ссылка: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
-# User-specific stuff
+# Пользовательские вещи
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
 
-# AWS User-specific
+# AWS Пользовательские
 .idea/**/aws.xml
 
-# Generated files
+# Сгенерированные файлы
 .idea/**/contentModel.xml
 
-# Sensitive or high-churn files
+# Чувствительные или файлы с высоким оборотом
 .idea/**/dataSources/
 .idea/**/dataSources.ids
 .idea/**/dataSources.local.xml
@@ -43,10 +39,10 @@ composer.phar
 .idea/**/gradle.xml
 .idea/**/libraries
 
-# Gradle and Maven with auto-import
-# When using Gradle or Maven with auto-import, you should exclude module files,
-# since they will be recreated, and may cause churn.  Uncomment if using
-# auto-import.
+# Gradle и Maven с авто-импортом
+# При использовании Gradle или Maven с авто-импортом, вы должны исключить файлы модулей,
+# так как они будут воссозданы и могут вызвать колебания. Раскомментируйте, если используете
+# авто-импорт.
 # .idea/artifacts
 # .idea/compiler.xml
 # .idea/jarRepositories.xml
@@ -59,96 +55,90 @@ composer.phar
 # CMake
 cmake-build-*/
 
-# Mongo Explorer plugin
+# Плагин Mongo Explorer
 .idea/**/mongoSettings.xml
 
-# File-based project format
+# Формат проекта на основе файлов
 *.iws
 
 # IntelliJ
 out/
 
-# mpeltonen/sbt-idea plugin
+# Плагин mpeltonen/sbt-idea
 .idea_modules/
 
-# JIRA plugin
+# Плагин JIRA
 atlassian-ide-plugin.xml
 
-# Cursive Clojure plugin
+# Плагин Cursive Clojure
 .idea/replstate.xml
 
-# SonarLint plugin
+# Плагин SonarLint
 .idea/sonarlint/
 
-# Crashlytics plugin (for Android Studio and IntelliJ)
+# Плагин Crashlytics (для Android Studio и IntelliJ)
 com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
-# Editor-based Rest Client
+# Редактор на основе Rest Client
 .idea/httpRequests
 
-# Android studio 3.1+ serialized cache file
+# Сериализованный файл кэша Android studio 3.1+
 .idea/caches/build_file_checksums.ser
 
-
-
 ### JetBrains Patch ###
-# Comment Reason: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
+# Причина комментария: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
 
 # *.iml
 # modules.xml
 # .idea/misc.xml
 # *.ipr
 
-# Sonarlint plugin
+# Плагин Sonarlint
 # https://plugins.jetbrains.com/plugin/7973-sonarlint
 .idea/**/sonarlint/
 
-# SonarQube Plugin
+# Плагин SonarQube
 # https://plugins.jetbrains.com/plugin/7238-sonarqube-community-plugin
 .idea/**/sonarIssues.xml
 
-# Markdown Navigator plugin
+# Плагин Markdown Navigator
 # https://plugins.jetbrains.com/plugin/7896-markdown-navigator-enhanced
 .idea/**/markdown-navigator.xml
 .idea/**/markdown-navigator-enh.xml
 .idea/**/markdown-navigator/
 
-# Cache file creation bug
-# See https://youtrack.jetbrains.com/issue/JBR-2257
+# Ошибка создания файла кэша
+# См. https://youtrack.jetbrains.com/issue/JBR-2257
 .idea/$CACHE_FILE$
 
-# CodeStream plugin
+# Плагин CodeStream
 # https://plugins.jetbrains.com/plugin/12206-codestream
 .idea/codestream.xml
 
-# Azure Toolkit for IntelliJ plugin
+# Плагин Azure Toolkit for IntelliJ
 # https://plugins.jetbrains.com/plugin/8053-azure-toolkit-for-intellij
 .idea/**/azureSettings.xml
-
-
 
 ### Linux ###
 *~
 
-# temporary files which can be created if a process still has a handle open of a deleted file
+# Временные файлы, которые могут быть созданы, если процесс все еще имеет открытый дескриптор удаленного файла
 .fuse_hidden*
 
-# KDE directory preferences
+# Настройки директории KDE
 .directory
 
-# Linux trash folder which might appear on any partition or disk
+# Корзина Linux, которая может появиться на любом разделе или диске
 .Trash-*
 
-# .nfs files are created when an open file is removed but is still being accessed
+# .nfs файлы создаются, когда открытый файл удаляется, но все еще используется
 .nfs*
 
-
-
 ### Node ###
-# Logs
+# Логи
 logs
 *.log
 npm-debug.log*
@@ -157,38 +147,38 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Diagnostic reports (https://nodejs.org/api/report.html)
+# Диагностические отчеты (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-# Runtime data
+# Данные во время выполнения
 pids
 *.pid
 *.seed
 *.pid.lock
 
-# Directory for instrumented libs generated by jscoverage/JSCover
+# Директория для инструментированных библиотек, созданных jscoverage/JSCover
 lib-cov
 
-# Coverage directory used by tools like istanbul
+# Директория покрытия, используемая такими инструментами, как istanbul
 coverage
 *.lcov
 
-# nyc test coverage
+# Покрытие тестов nyc
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+# Промежуточное хранилище Grunt (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
-# Bower dependency directory (https://bower.io/)
+# Директория зависимостей Bower (https://bower.io/)
 bower_components
 
-# node-waf configuration
+# Конфигурация node-waf
 .lock-wscript
 
-# Compiled binary addons (https://nodejs.org/api/addons.html)
+# Скомпилированные двоичные дополнения (https://nodejs.org/api/addons.html)
 build/Release
 
-# Dependency directories
+# Директории зависимостей
 node_modules/
 jspm_packages/
 
