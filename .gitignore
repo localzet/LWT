@@ -1,16 +1,22 @@
+# Thumbnails
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
 
+# Stackdump
 *.stackdump
 
+# Desktop.ini
 [Dd]esktop.ini
 
+# Recycle Bin
 $RECYCLE.BIN/
 
+# SVN
 .svn/
 
+# PPK, Log, Cab, MSI, MSIX, MSM, MSP, LNK, PID
 *.ppk
 *.log
 *.cab
@@ -19,47 +25,63 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk 
+*.pid
 
+# Tilde files
 *~
 
+# CSS, SASS, SCSS maps
 *.css.map
 *.sass.map
 *.scss.map
 
+# PHPUnit and PHPStan
 phpunit.xml
 /phpstan.neon
+
+# Composer
 composer.phar
 composer.lock
 /vendor/
 
-
+# Vim
 [._]*.s[a-v][a-z]
 !*.svg
 [._]*.sw[a-p]
 [._]s[a-rt-v][a-z]
 [._]ss[a-gi-z]
 [._]sw[a-p]
-
 Session.vim
 Sessionx.vim
 
+# Un~
 [._]*.un~
 
+# Node Modules and Coverage
 node_modules
 coverage
 
+# Build and Dist
 build
 dist
 
+# Dotfiles
 .*
 !.gitignore
 !.npmignore
 !.babelrc
 !.travis.yml
 
-!.idea
+# VSCode
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
+
+# JetBrains
+!.idea/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/shelf
