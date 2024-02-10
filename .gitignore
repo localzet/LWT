@@ -300,28 +300,6 @@ dist
 # *.iml
 # *.ipr
 
-# CMake
-
-# Плагин Mongo Explorer
-
-# Формат проекта на основе файлов
-
-# IntelliJ
-
-# Плагин mpeltonen/sbt-idea
-
-# Плагин JIRA
-
-# Плагин Cursive Clojure
-
-# Плагин SonarLint
-
-# Плагин Crashlytics (для Android Studio и IntelliJ)
-
-# Редактор на основе Rest Client
-
-# Сериализованный файл кэша Android studio 3.1+
-
 ### PhpStorm Patch ###
 # Причина комментария: https://github.com/joeblau/gitignore.io/issues/186#issuecomment-215987721
 
