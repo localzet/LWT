@@ -23,7 +23,9 @@
     }
   ],
   "support": {
-    "email": "support@localzet.com"
+    "email": "support@localzet.com",
+    "issues": "https://github.com/localzet/LWT/issues",
+    "source": "https://github.com/localzet/LWT",
   },
   "require": {
     "php": "^8.2",
