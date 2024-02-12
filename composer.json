@@ -1,9 +1,17 @@
 {
   "name": "localzet/lwt",
-  "description": "Localzet Web Tokens (JWT-based)",
+  "description": "Localzet LWT is a library for working with Localzet Web Tokens, which are based on JWT (JSON Web Tokens). It provides functionality for creating, verifying, and handling tokens using modern technologies and standards.",
   "type": "library",
   "keywords": [
-    "LWT"
+    "Localzet Web Tokens",
+    "JWT",
+    "PHP",
+    "library",
+    "localzet",
+    "AGPL",
+    "tokens",
+    "openssl",
+    "mbstring"
   ],
   "license": "AGPL-3.0-or-later",
   "authors": [
