@@ -59,14 +59,14 @@ final class LWT
      */
     private const ALLOWED_JWA = [
         'HS256', 'HS384', 'HS512',          // Симметричные алгоритмы
-        'RS256', 'RS384', 'RS512',          // Асимметричные алгоритмы (RSA-PKCS#1) 
+        'RS256', 'RS384', 'RS512',          // Асимметричные алгоритмы (RSA-PKCS#1)
         'ES256', 'ES384', 'ES512',          // Асимметричные алгоритмы, основанные на эллиптической кривой
         'EdDSA',                            // Асимметричный алгоритм, основанный на кривой Эдвардса (Ed25519 или Ed448)
         'RS1', 'HS1', 'HS256/64', 'ES256K', // Экспериментальные алгоритмы
         /*
             RS1 и HS1 используют алгоритм хэширования SHA-1
             HS256/64 после генерации сигнатуры оставляет только первые 8 символов
-            ES256K выделен для ECDSA на кривой secp256k1 
+            ES256K выделен для ECDSA на кривой secp256k1
         */
     ];
 
@@ -129,6 +129,12 @@ final class LWT
      * @var int DATA_ASYMMETRIC_PADDING
      */
     protected const DATA_ASYMMETRIC_PADDING = OPENSSL_PKCS1_OAEP_PADDING;
+    protected const DATA_ASYMMETRIC_PADDINGS = [
+        'OPENSSL_PKCS1_OAEP_PADDING',
+        'OPENSSL_PKCS1_PADDING',
+        'OPENSSL_SSLV23_PADDING',
+        'OPENSSL_NO_PADDING'
+    ];
 
     // Определение констант для работы с данными
 
@@ -415,11 +421,19 @@ final class LWT
                 throw new RuntimeException('Ошибка генерации ключа AES');
             }
 
+            $padding = self::DATA_ASYMMETRIC_PADDING;
+            foreach (self::DATA_ASYMMETRIC_PADDINGS as $paddingMode) {
+                if (defined($paddingMode)) {
+                    $padding = constant($paddingMode);
+                    break;
+                }
+            }
+
             // Зашифровываем ключ AES с помощью шифрования RSA
             if (@openssl_pkey_get_public(self::$DATA_KEY)) {
-                $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+                $encrypt = openssl_public_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, $padding);
             } elseif (@openssl_pkey_get_private(self::$DATA_KEY)) {
-                $encrypt = openssl_private_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+                $encrypt = openssl_private_encrypt($aesKey, $encryptedAesKey, self::$DATA_KEY, $padding);
             } else {
                 throw new RuntimeException('Ошибка ключа RSA');
             }
@@ -493,11 +507,19 @@ final class LWT
             // Удаляем информацию о длине ключа и сам ключ из данных
             $encryptedPayload = substr($payloadData, self::AES_KEY_LENGTH_OFFSET + $encryptedAesKeyLength);
 
+            $padding = self::DATA_ASYMMETRIC_PADDING;
+            foreach (self::DATA_ASYMMETRIC_PADDINGS as $paddingMode) {
+                if (defined($paddingMode)) {
+                    $padding = constant($paddingMode);
+                    break;
+                }
+            }
+
             // Расшифровываем ключ AES с помощью шифрования RSA
             if (@openssl_pkey_get_public(self::$DATA_KEY)) {
-                $decrypt = openssl_public_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+                $decrypt = openssl_public_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, $padding);
             } elseif (@openssl_pkey_get_private(self::$DATA_KEY)) {
-                $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, self::DATA_ASYMMETRIC_PADDING);
+                $decrypt = openssl_private_decrypt($encryptedAesKey, $aesKey, self::$DATA_KEY, $padding);
             } else {
                 throw new RuntimeException('Ошибка ключа RSA');
             }
@@ -796,15 +818,15 @@ final class LWT
             throw new DomainException(
                 $messages[$errno] ?? 'Ошибка JSON: ' . $errno
             );
-        } elseif ($decodedData === null && $jsonString !== 'null') {
-            // Если данные равны null, но строка не равна 'null', выбрасываем исключение
-            throw new DomainException('Попытка интерпретировать не-JSON');
+            // } elseif ($decodedData === null && $jsonString !== 'null') {
+            //     // Если данные равны null, но строка не равна 'null', выбрасываем исключение
+            //     throw new DomainException('Попытка интерпретировать не-JSON');
         }
 
-        if (!$decodedData) {
-            // Если при расшифровке произошла другая ошибка
-            throw new RuntimeException('Ошибка декодирования JSON');
-        }
+        // if (!$decodedData) {
+        //     // Если при расшифровке произошла другая ошибка
+        //     throw new RuntimeException('Ошибка декодирования JSON');
+        // }
 
         // Возвращаем декодированные данные
         return $decodedData;
