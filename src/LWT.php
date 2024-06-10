@@ -199,7 +199,7 @@ final class LWT
         switch (self::getClaim('alg')) {
             case 'HS1':
             case 'RS1':
-            $hashAlgorithm = 'SHA1';
+                $hashAlgorithm = 'SHA1';
                 break;
             case 'HS256':
             case 'RS256':
@@ -207,17 +207,17 @@ final class LWT
             case 'ES256K':
             case 'HS256/64':
             case 'EdDSA':
-            $hashAlgorithm = 'SHA256';
+                $hashAlgorithm = 'SHA256';
                 break;
             case 'HS384':
             case 'RS384':
             case 'ES384':
-            $hashAlgorithm = 'SHA384';
+                $hashAlgorithm = 'SHA384';
                 break;
             case 'HS512':
             case 'RS512':
             case 'ES512':
-            $hashAlgorithm = 'SHA512';
+                $hashAlgorithm = 'SHA512';
                 break;
             default:
                 throw new UnexpectedValueException('Недопустимый алгоритм шифрования');
@@ -229,12 +229,18 @@ final class LWT
     protected static function getClaim($claim): ?string
     {
         switch ($claim) {
-            case 'typ': return self::TYPE;
-            case 'cty': return self::$DATA_KEY ? 'LZX' : 'JWS';
-            case 'alg': return self::$ALGORITHM;
-            case 'kid': return self::$CLAIM_KID;
-            case 'enc': return self::$DATA_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null;
-            default: throw new UnexpectedValueException('Незарегистрированное утверждение JWT');
+            case 'typ':
+                return self::TYPE;
+            case 'cty':
+                return self::$DATA_KEY ? 'LZX' : 'JWS';
+            case 'alg':
+                return self::$ALGORITHM;
+            case 'kid':
+                return self::$CLAIM_KID;
+            case 'enc':
+                return self::$DATA_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null;
+            default:
+                throw new UnexpectedValueException('Незарегистрированное утверждение JWT');
         }
     }
 
