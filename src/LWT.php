@@ -754,13 +754,13 @@ final class LWT
      *
      * @param string $inputData Строка в формате base64url для декодирования.
      *
-     * @return false|string Возвращает декодированные данные или false, если произошла ошибка.
+     * @return string Возвращает декодированные данные или false, если произошла ошибка.
      *
      * @throws RuntimeException Ошибка декодирования base64
      *
      * @see https://www.php.net/manual/en/function.base64-decode.php
      */
-    public static function base64UrlDecode(string $inputData): false|string
+    public static function base64UrlDecode(string $inputData): string
     {
         // Вычисляем остаток от деления длины строки на 4
         $remainder = strlen($inputData) % self::BASE64_GROUP_SIZE;
