@@ -28,7 +28,7 @@
     "source": "https://github.com/localzet/LWT"
   },
   "require": {
-    "php": "^8.2",
+    "php": "^8.0",
     "ext-openssl": "*",
     "ext-mbstring": "*"
   },
