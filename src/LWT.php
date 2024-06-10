@@ -158,17 +158,31 @@ final class LWT
      */
     protected static function getEncryption(): string
     {
-        $encryption = match (self::getClaim('alg')) {
-            'HS1', 'HS256', 'HS256/64', 'HS384', 'HS512' => 'HMAC',
-            'RS1', 'RS256', 'RS384', 'RS512' => 'RSA-PKCS#1',
-            'ES256', 'ES256K', 'ES384', 'ES512' => 'ECDSA',
-            'EdDSA' => 'EdDSA',
-
-            default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
-        };
-
-        if (!$encryption) {
-            throw new RuntimeException('Ошибка получения алгоритма шифрования');
+        switch (self::getClaim('alg')) {
+            case 'HS1':
+            case 'HS256':
+            case 'HS256/64':
+            case 'HS384':
+            case 'HS512':
+                $encryption = 'HMAC';
+                break;
+            case 'RS1':
+            case 'RS256':
+            case 'RS384':
+            case 'RS512':
+                $encryption = 'RSA-PKCS#1';
+                break;
+            case 'ES256':
+            case 'ES256K':
+            case 'ES384':
+            case 'ES512':
+                $encryption = 'ECDSA';
+                break;
+            case 'EdDSA':
+                $encryption = 'EdDSA';
+                break;
+            default:
+                throw new UnexpectedValueException('Недопустимый алгоритм шифрования');
         }
 
         return $encryption;
@@ -182,18 +196,31 @@ final class LWT
      */
     protected static function getHashAlgorithm(): string
     {
-        $hashAlgorithm = match (self::getClaim('alg')) {
-            'HS1', 'RS1' => 'SHA1',
-            'HS256', 'RS256', 'ES256',
-            'ES256K', 'HS256/64', 'EdDSA' => 'SHA256',
-            'HS384', 'RS384', 'ES384' => 'SHA384',
-            'HS512', 'RS512', 'ES512' => 'SHA512',
-
-            default => throw new UnexpectedValueException('Недопустимый алгоритм шифрования'),
-        };
-
-        if (!$hashAlgorithm) {
-            throw new RuntimeException('Ошибка получения алгоритма хеширования');
+        switch (self::getClaim('alg')) {
+            case 'HS1':
+            case 'RS1':
+                $hashAlgorithm = 'SHA1';
+                break;
+            case 'HS256':
+            case 'RS256':
+            case 'ES256':
+            case 'ES256K':
+            case 'HS256/64':
+            case 'EdDSA':
+                $hashAlgorithm = 'SHA256';
+                break;
+            case 'HS384':
+            case 'RS384':
+            case 'ES384':
+                $hashAlgorithm = 'SHA384';
+                break;
+            case 'HS512':
+            case 'RS512':
+            case 'ES512':
+                $hashAlgorithm = 'SHA512';
+                break;
+            default:
+                throw new UnexpectedValueException('Недопустимый алгоритм шифрования');
         }
 
         return $hashAlgorithm;
@@ -201,24 +228,20 @@ final class LWT
 
     protected static function getClaim($claim): ?string
     {
-        return match ($claim) {
-            // Утверждения заголовка
-            'typ' => self::TYPE,
-            'cty' => self::$DATA_KEY ? 'LZX' : 'JWS',
-            'alg' => self::$ALGORITHM,
-            'kid' => self::$CLAIM_KID,
-            'enc' => self::$DATA_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null,
-
-            // Утверждения полезной нагрузки
-            // 'iss' => 'Issuer',
-            // 'sub' => 'Subject',
-            // 'aud' => 'Audience',
-            // 'nbf' => 'Not Before',
-            // 'iat' => 'Issued At',
-            // 'jti' => 'JWT ID',
-
-            default => throw new UnexpectedValueException('Незарегистрированное утверждение JWT')
-        };
+        switch ($claim) {
+            case 'typ':
+                return self::TYPE;
+            case 'cty':
+                return self::$DATA_KEY ? 'LZX' : 'JWS';
+            case 'alg':
+                return self::$ALGORITHM;
+            case 'kid':
+                return self::$CLAIM_KID;
+            case 'enc':
+                return self::$DATA_KEY ? self::$DATA_SYMMETRIC_ENCRYPTION . '+' . self::DATA_ASYMMETRIC_ENCRYPTION : null;
+            default:
+                throw new UnexpectedValueException('Незарегистрированное утверждение JWT');
+        }
     }
 
     /**
@@ -237,10 +260,10 @@ final class LWT
      * @throws Exception
      */
     public static function encode(
-        mixed  $lwtTokenData,
+        $lwtTokenData,
         string $signatureKey = null,
         string $tokenEncryption = null,
-        string $encryptionKey = null,
+        string $encryptionKey = null
     ): string
     {
         self::$ALGORITHM = $tokenEncryption;
@@ -289,8 +312,8 @@ final class LWT
         string $encodedToken,
         string $signatureKey = null,
         string $tokenEncryption = null,
-        string $encryptionKey = null,
-    ): mixed
+        string $encryptionKey = null
+    )
     {
         self::$ALGORITHM = $tokenEncryption;
         self::$SIGN_KEY = $signatureKey;
@@ -407,7 +430,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-cipher-iv-length.php
      * @see https://www.php.net/manual/en/function.openssl-encrypt.php
      */
-    protected static function generatePayloadSegment(mixed $lwtTokenData): string
+    protected static function generatePayloadSegment($lwtTokenData): string
     {
         // Кодируем данные в формате JSON
         $payloadData = self::jsonEncode($lwtTokenData);
@@ -487,7 +510,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.openssl-cipher-iv-length.php
      * @see https://www.php.net/manual/en/function.openssl-decrypt.php
      */
-    protected static function verifyPayloadSegment(string $lwtTokenPayloadSegment): mixed
+    protected static function verifyPayloadSegment(string $lwtTokenPayloadSegment)
     {
         // Декодируем тело из base64url
         $payloadData = self::base64UrlDecode($lwtTokenPayloadSegment);
@@ -727,7 +750,7 @@ final class LWT
      *
      * @see https://www.php.net/manual/en/function.base64-encode.php
      */
-    public static function base64UrlEncode(mixed $inputData): string
+    public static function base64UrlEncode($inputData): string
     {
         // Кодируем данные в формате base64
         $base64EncodedData = base64_encode($inputData);
@@ -799,7 +822,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.json-decode.php
      * @see https://www.php.net/manual/en/function.json-last-error.php
      */
-    protected static function jsonDecode(string $jsonString): mixed
+    protected static function jsonDecode(string $jsonString)
     {
         // Декодируем JSON-строку с использованием указанных флагов
         $decodedData = json_decode($jsonString, true, self::JSON_MAX_DEPTH, JSON_BIGINT_AS_STRING);
@@ -849,7 +872,7 @@ final class LWT
      * @see https://www.php.net/manual/en/function.json-encode.php
      * @see https://www.php.net/manual/en/function.json-last-error.php
      */
-    protected static function jsonEncode(mixed $inputData): string
+    protected static function jsonEncode($inputData): string
     {
         // Кодируем данные в формате JSON с использованием указанных флагов
         $encodedData = json_encode($inputData, JSON_UNESCAPED_SLASHES);
