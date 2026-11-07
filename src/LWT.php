@@ -337,12 +337,11 @@ final class LWT
         // Извлекаем сегменты заголовка, тела и криптографической подписи
         list($headerSegment, $payloadSegment, $signatureSegment) = $segments;
 
-        // Проверяем сегмент заголовка
+        // Verify authenticity before attempting payload decryption or JSON parsing.
+        // In particular, never expose a decryption error for an unsigned payload.
         self::verifyHeaderSegment($headerSegment);
-        // Проверяем сегмент полезной нагрузки и извлекаем расшифрованные данные
-        $payload = self::verifyPayloadSegment($payloadSegment);
-        // Проверяем сигнатуру токена
         self::verifySignature($headerSegment, $payloadSegment, $signatureSegment);
+        $payload = self::verifyPayloadSegment($payloadSegment);
 
         // Возвращаем расшифрованные данные
         return $payload;
@@ -785,6 +784,11 @@ final class LWT
      */
     public static function base64UrlDecode(string $inputData): string
     {
+        // Reject invalid characters instead of letting base64_decode silently skip them.
+        // JWT/LWT segments are URL-safe base64, with optional trailing padding.
+        if (!preg_match('/^[A-Za-z0-9_-]+={0,2}$/D', $inputData)) {
+            throw new RuntimeException('Ошибка декодирования base64');
+        }
         // Вычисляем остаток от деления длины строки на 4
         $remainder = strlen($inputData) % self::BASE64_GROUP_SIZE;
         if ($remainder) {
@@ -795,9 +799,9 @@ final class LWT
         // Заменяем символы '-', '_' и '' на '+', '/' и '=' соответственно
         $base64EncodedData = str_replace(['-', '_'], ['+', '/'], $inputData);
         // Декодируем данные из формата base64
-        $decodedData = base64_decode($base64EncodedData);
+        $decodedData = base64_decode($base64EncodedData, true);
 
-        if (!$decodedData) {
+        if ($decodedData === false) {
             throw new RuntimeException('Ошибка декодирования base64');
         }
 
